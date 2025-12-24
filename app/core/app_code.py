@@ -1,0 +1,19 @@
+from enum import IntEnum
+
+
+class AppCode(IntEnum):
+    """自定义业务code"""
+
+    RESOURCE_LOCKED = -1111
+    DECRYPT_ERROR = 30000
+
+    AUTH_ERROR = 40000
+    AUTH_INVALID = 40001
+    LOGOUT_FAIL = 40002
+    FORBIDDEN = 40003
+    ACCOUNT_NOT_EXIST = 40004
+    ACCOUNT_EXIST = 40005
+    SMS_SEND_FAILED = 40006
+    EMAIL_SEND_FAILED = 40007
+
+    UPLOAD_FAIL = 50001

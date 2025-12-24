@@ -1,0 +1,14 @@
+services:
+  api:
+    image: pickup
+    restart: on-failure:3
+    # command: uvicorn manage:app --host 0.0.0.0 --port 5555 --workers 2
+    env_file: .env.test
+    environment:
+      APP_ENV: testing
+    volumes:
+      - /data/logs/pickup:/data/logs/pickup
+      - /data/resource/pickup:/data/resource/pickup
+      - /data/db:/data/db
+    ports:
+      - "9005:5555"
