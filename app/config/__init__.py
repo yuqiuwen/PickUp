@@ -19,9 +19,7 @@ def load_config_class():
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(
-        extra="ignore", env_file_encoding="utf-8"
-    )
+    model_config = SettingsConfigDict(extra="ignore", env_file_encoding="utf-8")
 
     @field_validator("API_KEYS", mode="before")
     def parse_api_keys(cls, v):
@@ -40,22 +38,13 @@ class Settings(BaseSettings):
     FASTAPI_OPENAPI_URL: str | None = "/openapi.json"
 
     # CORS
-    CORS_ALLOWED_ORIGINS: list[str] = [
-        
-    ]
+    CORS_ALLOWED_ORIGINS: list[str] = []
 
     # 白名单路由列表
     WHITE_ROUTE_LIST: set[str] = {
         "/docs",
         "/redoc",
         "/openapi.json",
-        "/v1/auth/login",
-        "/v1/auth/signup",
-        "/v1/auth/signup/email",
-        "/v1/auth/email/send_code",
-        "/v1/sys/send_sms",
-        "/v1/auth/login/swagger",
-        "/v1/secret/rsa_public_key"
     }
 
     # 白名单路由正则
@@ -77,15 +66,15 @@ class Settings(BaseSettings):
         STATIC_DIR: Path = home / "data" / "resource" / APP_NAME
         LOG_DIR: Path = home / "data" / "logs" / APP_NAME
 
-    TOKEN_EXPIRES: int = 60 * 60 * 24 * 1
-    TOKEN_REFRESH_EXPIRE: int = 60 * 60 * 24 * 7
+    TOKEN_EXPIRES: int = 60 * 60 * 24 * 3
+    TOKEN_REFRESH_EXPIRE: int = 60 * 60 * 24 * 15
     TOKEN_SECRET_KEY: str = os.getenv("TOKEN_SECRET_KEY")  # secrets.token_urlsafe(32)
     COOKIE_REFRESH_TOKEN_KEY: str = "refresh_token"
     TOKEN_ALGORITHM: str = "HS256"
 
     API_KEYS: set[str] | None = None
 
-    ENABLE_SOCKET: bool = False   # 是否启用socket
+    ENABLE_SOCKET: bool = False  # 是否启用socket
 
     # DB
     SQLALCHEMY_ECHO: bool = False
@@ -100,15 +89,15 @@ class Settings(BaseSettings):
     REDIS_SOCKET_URL: str | None = os.getenv("REDIS_SOCKET_URL")
 
     # Email Service Configuration
-    EMAIL_SMTP_SERVER: str = os.getenv("EMAIL_SMTP_SERVER", "smtp.gmail.com")
-    EMAIL_SMTP_PORT: int = int(os.getenv("EMAIL_SMTP_PORT", "587"))
+    EMAIL_SMTP_SERVER: str = os.getenv("EMAIL_SMTP_SERVER")
+    EMAIL_SMTP_PORT: int = int(os.getenv("EMAIL_SMTP_PORT"))
     EMAIL_SENDER: str | None = os.getenv("EMAIL_SENDER")
     EMAIL_PASSWORD: str | None = os.getenv("EMAIL_PASSWORD")
 
     # 免授权直连
-    WS_NO_AUTH_MARKER: str = 'internal'
-    TOKEN_ONLINE_REDIS_PREFIX: str = f'{APP_NAME}:token_online'
-    SID_MAP_KEY: str = f'{APP_NAME}:sid_map'
+    WS_NO_AUTH_MARKER: str = "internal"
+    TOKEN_ONLINE_REDIS_PREFIX: str = f"{APP_NAME}:token_online"
+    SID_MAP_KEY: str = f"{APP_NAME}:sid_map"
 
     # Celery
     CELERY_BROKER_URL: str | None = os.getenv("CELERY_BROKER_URL")
@@ -152,7 +141,6 @@ class TestingConfig(Settings):
     DB_MAIN_TEST_URL: str | None = os.getenv("DB_MAIN_TEST_URL")
 
 
-
 class UnittestConfig(Settings):
     model_config = SettingsConfigDict(
         env_file=".env.unittest", env_ignore_empty=True, env_file_encoding="utf-8"
@@ -162,9 +150,7 @@ class UnittestConfig(Settings):
 
 
 class ProductionConfig(Settings):
-    model_config = SettingsConfigDict(
-        env_ignore_empty=True, env_file_encoding="utf-8"
-    )
+    model_config = SettingsConfigDict(env_ignore_empty=True, env_file_encoding="utf-8")
 
     FASTAPI_DOCS_URL: str | None = None
     FASTAPI_REDOC_URL: str | None = None
@@ -172,7 +158,6 @@ class ProductionConfig(Settings):
 
     LOG_LEVEL: int = logging.INFO
     SMS_URL: str | None = None
-    
 
 
 @lru_cache()

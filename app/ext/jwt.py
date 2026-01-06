@@ -5,7 +5,7 @@ import uuid
 from fastapi.security.utils import get_authorization_scheme_param
 from jose import JWTError, jwt
 from jose.exceptions import ExpiredSignatureError
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from fastapi import FastAPI, Request
 
 from app.config import settings
@@ -37,7 +37,8 @@ class TokenUserInfo(BaseModel):
     id: int
     username: str
     phone: str | None
-    role: str | None
+    roles: list[str] | None = Field(default_factory=list)
+
 
 @dataclass
 class AccessToken:
@@ -52,6 +53,12 @@ class RefreshToken:
     expire_in: datetime
 
 
+@dataclass
+class RespLoginSchema:
+    access_token: str
+    expire_in: int
+
+
 class JWTManager:
     def __init__(self, app: FastAPI = None):
         self.config = JWTConfig()
@@ -63,11 +70,10 @@ class JWTManager:
         userinfo: TokenUserInfo,
         additional_claims: dict[str, Any] = None,
     ) -> AccessToken:
-        
         """创建访问令牌"""
         if not isinstance(sub, str):
             sub = str(sub)
-            
+
         now = datetime.now(timezone.utc)
         expire = now + timedelta(seconds=self.config.ACCESS_TOKEN_EXPIRE)
         jti = str(uuid.uuid4())
@@ -124,7 +130,6 @@ class JWTManager:
         await JWTTokenCache(flg, sub, jti).add(sub, self.config.REFRESH_TOKEN_EXPIRE)
 
         return RefreshToken(token=encoded_jwt, expire_in=expire)
-    
 
     def verify_token(self, token: str, verify_exp=True) -> TokenData:
         """验证令牌并返回payload"""
@@ -183,7 +188,9 @@ class JWTManager:
         await JWTTokenCache(self.config.AC_TOKEN_KEY, token_obj.user_id, token_obj.jti).delete()
 
         access_token: AccessToken = await self.create_access_token(user_id, multi_login, userinfo)
-        refresh_token: RefreshToken = await self.create_refresh_token(user_id, access_token.jti, multi_login)
+        refresh_token: RefreshToken = await self.create_refresh_token(
+            user_id, access_token.jti, multi_login
+        )
 
         return access_token, refresh_token
 
@@ -194,18 +201,19 @@ class JWTManager:
         :param request: FastAPI 请求对象
         :return:
         """
-        authorization = request.headers.get('Authorization')
+        authorization = request.headers.get("Authorization")
         scheme, token = get_authorization_scheme_param(authorization)
-        if not authorization or scheme.lower() != 'bearer':
+        if not authorization or scheme.lower() != "bearer":
             raise AuthException("Token invalid", errmsg="身份凭证无效")
-        
+
         if verify:
             token_payload = self.verify_token(token, verify_exp=verify_exp)
             return token_payload
         return token
 
-
-    async def get_refresh_token(self, request: Request, verify=False, verify_exp=True) -> TokenData | str:
+    async def get_refresh_token(
+        self, request: Request, verify=False, verify_exp=True
+    ) -> TokenData | str:
         """
         获取refresh token
 

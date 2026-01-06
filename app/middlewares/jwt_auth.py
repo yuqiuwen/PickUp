@@ -57,17 +57,24 @@ class JwtAuthMiddleware(AuthenticationBackend):
         """
         try:
             token_payload = jwt_manager.verify_token(
-                token, 
-                verify_exp=request.url.path != "/v1/auth/refresh"
+                token, verify_exp=request.url.path != "/v1/auth/refresh"
             )
             user_id = token_payload.user_id
-            userinfo = await jwt_manager.load_from_cache(user_id, token_payload.jti, "access")
+            userinfo = await jwt_manager.load_from_cache(
+                user_id, token_payload.jti, token_payload.flg
+            )
             if not userinfo:
-                raise _AuthenticationError(code=AppCode.AUTH_INVALID, msg="token expired", errmsg="登录状态已过期")
+                raise _AuthenticationError(
+                    code=AppCode.AUTH_INVALID, msg="token expired", errmsg="登录状态已过期"
+                )
             return userinfo
         except AuthException as e:
             # 将业务层的 AuthException 转换为 middleware 层的 _AuthenticationError
             raise _AuthenticationError(code=e.code, msg=e.message, errmsg=e.errmsg)
+        except Exception:
+            raise _AuthenticationError(
+                code=AppCode.INTERNAL_ERROR, msg="server error!", errmsg="系统异常"
+            )
 
     async def authenticate(self, request: Request) -> tuple[AuthCredentials, TokenUserInfo] | None:
         """
@@ -80,19 +87,45 @@ class JwtAuthMiddleware(AuthenticationBackend):
         token = request.headers.get("Authorization")
         path = request.url.path
 
+        if not token:
+            return
+
         if path in settings.WHITE_ROUTE_LIST:
             return
         for pattern in settings.WHITE_ROUTE_PATTERN:
             if pattern.match(path):
                 return
 
-        if not token:
-            raise _AuthenticationError(code=AppCode.AUTH_INVALID, msg="token is required", errmsg="未登录")
-
         scheme, token = get_authorization_scheme_param(token)
         if scheme.lower() != "bearer":
-            raise _AuthenticationError(msg="invalid token scheme", errmsg="token scheme invalid")
+            return
 
         user = await self.jwt_authentication(token, request)
 
         return AuthCredentials(["authenticated"]), user
+
+    # async def authenticate_all(self, request: Request) -> tuple[AuthCredentials, TokenUserInfo] | None:
+    #     """
+    #     全局鉴权
+
+    #     :param request: FastAPI 请求对象
+    #     :return:
+    #     """
+    #     token = request.headers.get("Authorization")
+    #     path = request.url.path
+
+    #     if path in settings.WHITE_ROUTE_LIST:
+    #         return
+    #     for pattern in settings.WHITE_ROUTE_PATTERN:
+    #         if pattern.match(path):
+    #             return None
+    #     if not token:
+    #         raise _AuthenticationError(code=AppCode.AUTH_INVALID, msg="token is required", errmsg="未登录")
+
+    #     scheme, token = get_authorization_scheme_param(token)
+    #     if scheme.lower() != "bearer":
+    #         raise _AuthenticationError(msg="invalid token scheme", errmsg="token scheme invalid")
+
+    #     user = await self.jwt_authentication(token, request)
+
+    #     return AuthCredentials(["authenticated"]), user

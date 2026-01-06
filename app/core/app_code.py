@@ -17,3 +17,5 @@ class AppCode(IntEnum):
     EMAIL_SEND_FAILED = 40007
 
     UPLOAD_FAIL = 50001
+
+    VERIFY_CODE_ERROR = 60000

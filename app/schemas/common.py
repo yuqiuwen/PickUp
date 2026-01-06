@@ -1,6 +1,7 @@
 from typing import Annotated, Any
 
 from pydantic import BaseModel, Field, ConfigDict, TypeAdapter, BeforeValidator, field_validator
+from pydantic import EmailStr
 
 from app.constant import SMSSendBiz
 from app.core.exception import ValidateError
@@ -82,3 +83,8 @@ class SmsSchema(BaseModel):
         if not check_phone(value):
             raise ValidateError(errmsg="手机号格式错误")
         return value
+
+
+class EmailSchema(BaseModel):
+    biz: SMSSendBiz
+    email: EmailStr

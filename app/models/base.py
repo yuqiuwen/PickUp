@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 import time
 from sqlalchemy import Integer, String, BigInteger, TIMESTAMP, DateTime, Identity, func, text
 from sqlalchemy.ext.declarative import declarative_base
@@ -11,7 +12,7 @@ Base = declarative_base()
 class BaseModel(Base):
     __abstract__ = True
 
-    id = Column(Integer, Identity(always=True), primary_key=True)
+    id = Column(Integer, primary_key=True)
 
 
 class ULIDModel(Base):
@@ -29,12 +30,22 @@ class BaseBigModel(BaseModel):
 class TSModel(Base):
     __abstract__ = True
 
-    ctime = Column(Integer, nullable=False, default=time.time, server_default=text("EXTRACT(EPOCH FROM now())::int"))
-    utime = Column(Integer, nullable=False, default=time.time, onupdate=time.time, server_default=text("EXTRACT(EPOCH FROM now())::int"))
+    ctime = Column(Integer, nullable=False, server_default=text("EXTRACT(EPOCH FROM now())::int"))
+    utime = Column(
+        Integer,
+        nullable=False,
+        onupdate=lambda: int(time.time()),
+        server_default=text("EXTRACT(EPOCH FROM now())::int"),
+    )
 
 
 class TimeModel(Base):
     __abstract__ = True
 
-    ctime = Column(TIMESTAMP, nullable=False, default=time.time, server_default=func.now())
-    utime = Column(TIMESTAMP, nullable=False, default=time.time, onupdate=time.time, server_default=func.now())
+    ctime = Column(TIMESTAMP, nullable=False, server_default=func.now())
+    utime = Column(
+        TIMESTAMP,
+        nullable=False,
+        onupdate=lambda: datetime.now(timezone.utc),
+        server_default=func.now(),
+    )

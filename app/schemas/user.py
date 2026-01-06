@@ -6,20 +6,22 @@ from typing_extensions import Self
 from pydantic import (
     BaseModel,
     Field,
+    ValidationInfo,
     model_validator,
     ConfigDict,
     field_validator,
     EmailStr,
     field_serializer,
     SerializationInfo,
+    validate_email,
 )
 
-from app.constant import AuthType
+from app.constant import AuthType, SMSSendBiz
 from app.ext.crypt import pwd_crypto
 from app.core.exception import ValidateError
 from app.schemas.common import EntityModel
 
-from app.utils.common import check_phone, hide_phone
+from app.utils.common import auto_detect_auth_type, check_phone, hide_phone
 
 
 def validate_user_pwd(pwd: str) -> Tuple[bool, str]:
@@ -30,82 +32,72 @@ def validate_user_pwd(pwd: str) -> Tuple[bool, str]:
     return True, ""
 
 
+def validate_account(account: str) -> bool:
+    if len(account) > 12 or len(account) < 6:
+        raise ValidateError(errmsg="账号长度必须在6-12个字符")
+    if not re.match(r"^[_a-zA-Z0-9-]+$", account):
+        raise ValidateError(errmsg="账号只能包含英文、数字、下划线、短横线")
+    return True
+
+
 class SignSchema(BaseModel):
-    account: str = Field()
-    pwd: str = Field()
+    """
+    注册 Schema
+    账号和邮箱登录需要密码，其他登录方式不需要密码
+    """
 
-    @field_validator("account")
-    @classmethod
-    def validate_account(cls, v):
-        # 验证账户
-        if len(v) > 12 or len(v) < 6:
-            raise ValidateError(errmsg="账号长度必须在6-12个字符")
-        if not re.match(r"^[_a-zA-Z0-9-]+$", v):
-            raise ValidateError(errmsg="账号只能包含英文、数字、下划线、短横线")
-
-        return v
+    auth_type: AuthType
+    account: str = Field(
+        description="账号/手机号/邮箱/微信，其中账号只能包含英文、数字、下划线、短横线，长度必须在6-12个字符"
+    )
+    pwd: str = Field(default=None, description="密码（加密后）")
+    code: str = Field(default=None, description="验证码")
+    username: str = Field(default=None, description="用户名")
+    is_encrypted: bool = Field(default=True, description="是否已加密")
 
     @model_validator(mode="after")
     def validate_data(self) -> Self:
-        self.pwd = pwd_crypto.decrypt(self.pwd, as_str=True)
-        is_valid, errmsg = validate_user_pwd(self.pwd)
-        if not is_valid:
-            raise ValidateError(errmsg=errmsg)
+        if self.username:
+            if len(self.username) > 20 or len(self.username) < 4:
+                raise ValidateError(errmsg="用户名长度必须在4-20个字符")
+
+        if self.auth_type in (AuthType.ACCOUNT, AuthType.EMAIL):
+            if not self.pwd:
+                raise ValidateError(errmsg="密码不能为空")
+            if self.auth_type == AuthType.ACCOUNT:
+                validate_account(self.account)
+
+            if self.is_encrypted:
+                self.pwd = pwd_crypto.decrypt(self.pwd, as_str=True)
+                is_valid, errmsg = validate_user_pwd(self.pwd)
+                if not is_valid:
+                    raise ValidateError(errmsg=errmsg)
+
+        elif self.auth_type == AuthType.PHONE:
+            if not check_phone(self.account):
+                raise ValidateError(errmsg="手机号格式错误")
+
+        elif self.auth_type == AuthType.EMAIL:
+            if not validate_email(self.account):
+                raise ValidateError(errmsg="邮箱格式错误")
         return self
-
-
-class EmailSignSchema(BaseModel):
-    """邮箱注册 Schema"""
-    email: EmailStr = Field(description="邮箱地址")
-    pwd: str = Field(description="密码（加密后）")
-    code: str = Field(description="邮箱验证码")
-    
-    @field_validator("email")
-    @classmethod
-    def validate_email(cls, v):
-        # 验证邮箱格式（EmailStr 已经验证了基本格式）
-        if not v:
-            raise ValidateError(errmsg="邮箱不能为空")
-        return v.lower()  # 转为小写统一处理
-    
-    @model_validator(mode="after")
-    def validate_data(self) -> Self:
-        # 解密密码
-        self.pwd = pwd_crypto.decrypt(self.pwd, as_str=True)
-        is_valid, errmsg = validate_user_pwd(self.pwd)
-        if not is_valid:
-            raise ValidateError(errmsg=errmsg)
-        
-        # 验证码长度检查
-        if not self.code or len(self.code) != 6:
-            raise ValidateError(errmsg="验证码格式错误")
-        
-        return self
-
-
-class SendEmailCodeSchema(BaseModel):
-    """发送邮箱验证码 Schema"""
-    email: EmailStr = Field(description="邮箱地址")
-    biz: str = Field(description="业务场景: sign-注册, login-登录, set_pwd-重置密码")
-    
-    @field_validator("email")
-    @classmethod
-    def validate_email(cls, v):
-        if not v:
-            raise ValidateError(errmsg="邮箱不能为空")
-        return v.lower()
 
 
 class LoginSchema(BaseModel):
-    auth_type: AuthType
+    auth_type: AuthType | None = Field(default=None, description="登录方式，不传则自动推测")
     code_type: Literal["pwd", "code"]  # 凭证类型：验证码或密码
     code: str  # 凭证
     account: str  # 账号或手机号
 
     @model_validator(mode="after")
-    def validate_data(self) -> Self:
+    def validate_data(self, info: ValidationInfo) -> Self:
+        if not self.auth_type:
+            self.auth_type = auto_detect_auth_type(self.account)
         if self.code_type == "pwd":
-            decrypted_code = pwd_crypto.decrypt(self.code, as_str=True)
+            if (info.context or {}).get("is_encrypted", True):
+                decrypted_code = pwd_crypto.decrypt(self.code, as_str=True)
+            else:
+                decrypted_code = self.code
             is_valid, errmsg = validate_user_pwd(decrypted_code)
             if not is_valid:
                 raise ValidateError(errmsg=errmsg)
@@ -153,11 +145,13 @@ class ModifyPwdSchema(BaseModel):
     new_pwd: str
     validate_way: Literal["pwd", "code"]  # 验证方式：验证码或密码
     code: str | None = None
+    account: str | None = None
+    auth_type: AuthType | None = None
 
     @model_validator(mode="after")
     def load_data(self):
-        if self.validate_way not in ["pwd", "code"]:
-            raise ValidateError("validate_way must be in [pwd, code]", errmsg="验证方式错误")
+        if self.account is not None:
+            self.auth_type = auto_detect_auth_type(self.account)
 
         self.new_pwd = pwd_crypto.decrypt(self.new_pwd, as_str=True)
         if self.validate_way == "pwd":
@@ -174,6 +168,8 @@ class ModifyPwdSchema(BaseModel):
         else:
             if not self.code:
                 raise ValidateError(errmsg="验证码不能为空")
+            if not self.account:
+                raise ValidateError(errmsg="邮箱或手机号不能为空")
         return self
 
 
@@ -189,3 +185,12 @@ class SetPwdSchema(BaseModel):
             raise ValidateError(errmsg=errmsg)
         self.new_pwd = pwd
         return self
+
+
+class UpdateUserSchema(BaseModel):
+    username: str | None = Field(default=None, description="用户名", min_length=4, max_length=20)
+    title: str | None = Field(default=None, description="头衔", max_length=20)
+    introduce: str | None = Field(default=None, description="介绍", max_length=100)
+    gender: int | None = Field(default=None, description="性别 0女 / 1男")
+    birth: date | None = None
+    avatar: str | None = None

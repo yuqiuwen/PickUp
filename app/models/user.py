@@ -11,6 +11,7 @@ class User(BaseModel, TSModel):
 
     __tablename__ = "user"
 
+    id = Column(Integer, Identity(always=True, start=10000001), primary_key=True)
     account = Column(String(20), unique=True)
     username = Column(String(50), nullable=False)
     password_hash = Column(String(128))

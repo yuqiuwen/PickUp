@@ -4,9 +4,10 @@ from typing import Literal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ext.jwt import TokenUserInfo
 from app.models.user import User
 from app.repo.user import UserRepo, user_repo
-from app.schemas.user import UserAuthInfoSchema, UserSchema
+from app.schemas.user import UpdateUserSchema, UserSchema
 
 
 class UserService:
@@ -15,34 +16,22 @@ class UserService:
         return "用户" + "".join(random.choices(string.ascii_letters + string.digits, k=6))
 
     @staticmethod
-    async def create_by_account(session, account: str, password: str, commit=True):
-        user = await user_repo.create_user(
+    async def create_user(
+        session,
+        account: str = None,
+        password: str = None,
+        username: str = None,
+        email: str = None,
+        commit=True,
+    ):
+        if not username:
+            username = UserService.gen_random_username()
+        user = await user_repo.add(
             session,
-            username=UserService.gen_random_username(),
             account=account,
+            username=username,
             password=password,
-            commit=False,
-        )
-        if commit:
-            await session.commit()
-        return user
-
-    @staticmethod
-    async def create_by_email(session, email: str, password: str, commit=True):
-        """
-        通过邮箱创建用户
-        
-        :param session: 数据库会话
-        :param email: 邮箱地址
-        :param password: 密码
-        :param commit: 是否立即提交
-        :return: 用户对象
-        """
-        user = await user_repo.create_user(
-            session,
-            username=UserService.gen_random_username(),
             email=email,
-            password=password,
             commit=False,
         )
         if commit:
@@ -61,8 +50,12 @@ class UserService:
         return await user_repo.get_by_cond(session, cond)
 
     @staticmethod
-    async def get_me_detail(session, user: "UserAuthInfoSchema") -> UserSchema:
-        user_obj = await user_repo.get_or_404(session, user.id)
+    async def get_me_detail(session, user: TokenUserInfo) -> UserSchema:
+        user_obj = await user_repo.retrieve_or_404(session, user.id)
         userinfo = UserSchema.model_validate(user_obj).model_dump(context={"mask_phone": True})
         return userinfo
-        
+
+    @staticmethod
+    async def update_me(session, user, data: UpdateUserSchema):
+        user_obj = await user_repo.edit(session, user.id, data.model_dump(exclude_unset=True))
+        return user_obj

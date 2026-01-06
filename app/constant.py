@@ -52,3 +52,9 @@ class SMSSendBiz(EnumPro):
     SET_PWD = "set_pwd", "设置密码"
     BIND_PHONE = "bind_phone", "绑定手机号"
     REVOKE = "revoke", "注销"
+
+
+class UserRole(EnumPro):
+    SUPER = "super", "超级管理员"
+    ADMIN = "admin", "管理员"
+    USER = "user", "用户"

@@ -6,13 +6,8 @@ from ulid import ULID
 from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.config import settings
-from app.core import make_response
-from app.core.app_code import AppCode
-from app.core.dependencies import UrlSafeTimedSerializer
+
 from app.core.loggers import app_logger
-from app.schemas.user import UserAuthInfoSchema
-from app.services.cache.user import TokenCache
 
 
 def register_middleware(app):

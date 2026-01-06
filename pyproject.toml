@@ -39,7 +39,7 @@ dependencies = [
 
 [tool.ruff]
 line-length = 100
-target-version = "py39"
+target-version = "py312"
 exclude = [
     ".bzr",
     ".direnv",
@@ -81,4 +81,3 @@ line-ending = "auto"    # automatically detect the appropriate line ending.
 # name = "tuna"
 # url = "https://pypi.tuna.tsinghua.edu.cn/simple"
 # default = true   # 设为默认主索引源
-

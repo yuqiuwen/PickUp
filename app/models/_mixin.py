@@ -88,8 +88,8 @@ class BaseMixin(Generic[Model]):
             else:
                 pass
 
-    async def update(self, session, instance: Model, commit=True, **kwargs):
-        for attr, value in kwargs.items():
+    async def update(self, session, instance: Model, data: dict, commit=True, **kwargs):
+        for attr, value in data.items():
             setattr(instance, attr, value)
         await self.save(session, instance, commit=commit)
         return instance
@@ -212,4 +212,3 @@ class BaseMixin(Generic[Model]):
         if query_one:
             return cursor_result.mappings().one() or None
         return cursor_result.mappings().all() or []
-

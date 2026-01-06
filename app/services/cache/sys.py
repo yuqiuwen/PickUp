@@ -1,4 +1,5 @@
 from app.constant import SMSSendBiz
+from app.core.app_code import AppCode
 from app.core.exception import AuthException
 from app.database import redcache
 from . import BaseCache, CacheKey
@@ -59,7 +60,7 @@ class VerifyCodeCache(BaseCache):
         """
         cache_code = await self.get()
         if not code or not cache_code or code != cache_code:
-            raise AuthException(errmsg="验证码错误")
+            raise AuthException(code=AppCode.VERIFY_CODE_ERROR, errmsg="验证码错误")
         if is_delete:
             await self.delete()
         return code

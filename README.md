@@ -4,28 +4,31 @@
 ## 目录结构
 ```bash
 .
-├── alembic
+├── alembic                 # 数据迁移版本
 │   ├── env.py
 │   ├── README
 │   ├── script.py.mako
 │   └── versions
 ├── alembic.ini
-├── app
-│   ├── __init__.py
-│   ├── config
-│   ├── constant.py
-│   ├── core
-│   ├── database
-│   ├── ext
-│   ├── middlewares
-│   ├── models
-│   ├── repo
-│   ├── routers
-│   ├── schemas
-│   ├── services
-│   ├── tests
-│   └── utils
-├── deployment
+├── app                     # app核心目录
+│   ├── __init__.py         # 初始化
+│   ├── celery.py           # celery 初始化
+│   ├── common              # 公共目录
+│   ├── config              # 配置文件
+│   ├── constant.py         # 全局枚举
+│   ├── core                # 核心依赖
+│   ├── database            # db相关
+│   ├── ext                 # 插件
+│   ├── middlewares         # 中间件
+│   ├── models              # model层
+│   ├── repo                # repo层
+│   ├── routers             # 路由层
+│   ├── schemas             # 数据schema
+│   ├── services            # service层
+│   ├── tasks               # celery task
+│   ├── tests               # 测试
+│   └── utils               # 工具包
+├── deployment              # 部署脚本
 │   ├── deploy-docker.sh
 │   └── deploy-docker.test.sh
 ├── docker-compose.dev.yml
@@ -33,9 +36,12 @@
 ├── docker-entrypoint.sh
 ├── Dockerfile
 ├── docs
+│   ├── EMAIL_SIGNUP.md
 │   └── init.sql
 ├── gunicorn.conf.py
-├── manage.py
+├── gunicorn.conf.test.py
+├── LICENSE
+├── manage.py               # 执行入口
 ├── pyproject.toml
 ├── README.md
 ├── requirements.txt
