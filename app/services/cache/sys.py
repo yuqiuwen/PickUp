@@ -33,6 +33,7 @@ class VerifyCodeCache(BaseCache):
     __KEY__ = CacheKey.VERIFY_PHONE_CODE.value
 
     def __init__(self, biz: SMSSendBiz, phone: str):
+        # phone: 手机号或三方账号
         if not phone:
             raise ValueError("phone or email can not be null")
         self.key = self.__KEY__.format(biz.value, phone)
@@ -47,7 +48,7 @@ class VerifyCodeCache(BaseCache):
         return await redcache.setex(self.key, 600, code)
 
     async def delete(self):
-        return redcache.delete(self.key)
+        return await redcache.delete(self.key)
 
     async def exists(self):
         return await redcache.exists(self.key)

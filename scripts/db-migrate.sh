@@ -2,13 +2,13 @@
 
 :<<!
 ### 生成迁移
-./scripts/migrate.sh development generate "add users"
+./scripts/db-migrate.sh development generate "add users"
 
 ### 执行迁移
-./scripts/migrate.sh development upgrade
+./scripts/db-migrate.sh development upgrade
 
 ### 回退迁移
-./scripts/migrate.sh development downgrade
+./scripts/db-migrate.sh development downgrade
 !
 
 

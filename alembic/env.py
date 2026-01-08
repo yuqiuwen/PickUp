@@ -1,15 +1,29 @@
+# ruff: noqa: E402
 import asyncio
 from logging.config import fileConfig
+import os
+from pathlib import Path
 
-from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
-
 from alembic import context
+from dotenv import load_dotenv
 
-from app.config import settings
+
+def load_env(cfg_name):
+    if cfg_name in ("production",):
+        return
+
+    env_dic = {"development": ".env", "testing": ".env.test", "unittest": ".env.unittest"}
+    envfile = env_dic.get(cfg_name)
+    env_path = str(Path(__file__).parent.parent / envfile)
+    load_dotenv(dotenv_path=env_path, override=True)
 
 
+load_env(os.getenv("APP_ENV", "development"))
+
+
+from app.config import settings  # noqa
 
 
 # this is the Alembic Config object, which provides
@@ -27,8 +41,8 @@ if config.config_file_name is not None:
 # target_metadata = mymodel.Base.metadata
 
 
-
 from app.models.base import Base
+
 target_metadata = Base.metadata
 
 
@@ -59,7 +73,6 @@ def include_object(object, name, type_, reflected, compare_to):
     return not reflected  # 只反射本地模型数据,不反射数据库中的表
 
 
-
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
 
@@ -83,14 +96,15 @@ def run_migrations_offline() -> None:
     with context.begin_transaction():
         context.run_migrations()
 
+
 def do_run_migrations(connection):
     context.configure(
-            connection=connection, 
-            target_metadata=target_metadata, 
-            include_object=include_object, 
-            compare_type=True,
-            compare_server_default=True
-        )
+        connection=connection,
+        target_metadata=target_metadata,
+        include_object=include_object,
+        compare_type=True,
+        compare_server_default=True,
+    )
 
     with context.begin_transaction():
         context.run_migrations()

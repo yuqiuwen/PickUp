@@ -13,6 +13,7 @@ from app.utils.paginator import CursorPaginatedResponse, PaginatedResponse
 
 T = TypeVar("T")
 
+
 class RespModel(BaseModel, Generic[T]):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -21,27 +22,28 @@ class RespModel(BaseModel, Generic[T]):
     data: T | None = None
     errmsg: str | None = None
 
-    @model_serializer(mode='wrap')
-    def serialize(self, serializer):
-        # TODO 先让 Pydantic 序列化所有字段（包括泛型类型）
-        result = serializer(self)
-        if self.data is not None:
-            result["data"] = self.data
-        if self.errmsg is not None:
-            result["errmsg"] = self.errmsg
+    # @model_serializer(mode='wrap')
+    # def serialize(self, serializer):
+    #     # TODO 先让 Pydantic 序列化所有字段（包括泛型类型）
+    #     result = serializer(self)
+    #     if self.data is not None:
+    #         result["data"] = self.data
+    #     if self.errmsg is not None:
+    #         result["errmsg"] = self.errmsg
 
-        return {k: v for k, v in result.items() if v is not None}
-    
+    #     return {k: v for k, v in result.items() if v is not None}
 
 
 class PageRespModel(RespModel[PaginatedResponse[T]], Generic[T]):
     """统一分页响应：外层 RespModel，data 里是 PaginatedResponse[T]"""
+
     pass
+
 
 class CursorPageRespModel(RespModel[CursorPaginatedResponse[T]], Generic[T]):
     """统一游标分页响应：外层 RespModel，data 里是 CursorPaginatedResponse[T]"""
-    pass
 
+    pass
 
 
 class MsgSpecJSONResponse(JSONResponse):
@@ -51,6 +53,7 @@ class MsgSpecJSONResponse(JSONResponse):
 
     def render(self, content: Any) -> bytes:
         return msgspec_json.encode(content)
+
 
 def _build_resp_body(code: int, msg: str, data: Any = None, errmsg: str | None = None) -> dict:
     ret = {"code": code, "msg": msg}
@@ -62,7 +65,9 @@ def _build_resp_body(code: int, msg: str, data: Any = None, errmsg: str | None =
     return ret
 
 
-def make_response(msg="successful", *, data: Any | BaseModel = None, code=0, errmsg=None) -> RespModel:
+def make_response(
+    msg="successful", *, data: Any | BaseModel = None, code=0, errmsg=None
+) -> RespModel:
     resp = RespModel(
         code=code,
         msg=msg,
@@ -70,7 +75,6 @@ def make_response(msg="successful", *, data: Any | BaseModel = None, code=0, err
         data=data,
     )
     return resp
-
 
 
 def make_json_response(msg="successful", *, data: Any = None, code=0, errmsg=None):
@@ -83,13 +87,11 @@ def make_fast_response(msg="successful", *, data: Any = None, code=0, errmsg=Non
     return MsgSpecJSONResponse(data)
 
 
-
 def register_exc_handler(app):
     default_msg = "系统出错啦~"
     default_code = 500
 
-
-    # 通用的 Exception 
+    # 通用的 Exception
     @app.exception_handler(Exception)
     def custom_exc_handler(request, exc: Exception):
         app_logger.error(str(exc))

@@ -2,7 +2,7 @@ import time
 
 import bcrypt
 
-from app.constant import UserType
+from app.constant import GroupRole, UserType
 from app.models.module import *
 
 
@@ -11,7 +11,7 @@ class User(BaseModel, TSModel):
 
     __tablename__ = "user"
 
-    id = Column(Integer, Identity(always=True, start=10000001), primary_key=True)
+    id = Column(BigInteger, Identity(always=True, start=10000001), primary_key=True)
     account = Column(String(20), unique=True)
     username = Column(String(50), nullable=False)
     password_hash = Column(String(128))
@@ -39,3 +39,53 @@ class User(BaseModel, TSModel):
             return False
 
         return bcrypt.checkpw(password.encode("utf-8"), self.password_hash.encode("utf8"))
+
+
+class UserDevices(ULIDModel, TSModel):
+    """用户设备"""
+
+    __tablename__ = "user_device"
+
+    user_id = Column(BigInteger, nullable=False, comment="用户ID")
+    device_id = Column(String(32), nullable=False, comment="设备ID")
+    device_type = Column(SmallInteger, nullable=False, comment="设备类型")
+    device_token = Column(String(255), nullable=False, comment="设备Token")
+
+
+class UserSettings(ULIDModel, TSModel):
+    """用户设置"""
+
+    __tablename__ = "user_settings"
+
+    user_id = Column(BigInteger, nullable=False, comment="用户ID")
+    settings_id = Column(Integer, nullable=False, comment="设置ID SettingsModel.id")
+    value = Column(String, comment="设置值, 默认为settings.value")
+
+    settings = relationship(
+        "SettingsModel",
+        lazy="joined",
+        viewonly=True,
+        primaryjoin="UserSettings.settings_id == foreign(SettingsModel.id)",
+    )
+
+
+class ShareGroupModel(ULIDModel, TSModel, BigOperatorModel):
+    """共享组"""
+
+    __tablename__ = "share_group"
+
+    owner_id = Column(BigInteger, nullable=False, index=True)
+    name = Column(String(50), nullable=False, comment="共享组名称")
+    description = Column(String(100), comment="描述")
+    cover = Column(String(255), comment="封面")
+    max_members = Column(SmallInteger, nullable=False, default=100, comment="最大成员数")
+    is_public = Column(SmallInteger, nullable=False, default=1, comment="0私密 1公开")
+
+
+class ShareGroupMemberModel(BaseModel, TSModel):
+    __tablename__ = "share_group_member"
+    __table_args__ = (Index("ix_share_group_member_user", "user_id"),)
+
+    group_id = Column(String(32), primary_key=True)
+    user_id = Column(BigInteger, primary_key=True)
+    role = Column(SmallInteger, nullable=False, default=GroupRole.MEMBER, comment="GroupRole")

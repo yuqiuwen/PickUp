@@ -10,10 +10,21 @@ from app.config import settings
 
 
 class BaseAPIRouter(APIRouter):
-    def __init__(self, *args, enable_req_log=settings.ENABLE_REQ_LOG, **kwargs):
+    def __init__(
+        self,
+        *args,
+        enable_req_log=settings.ENABLE_REQ_LOG,
+        response_model_exclude_none=True,
+        **kwargs,
+    ):
         super().__init__(*args, **kwargs)
+        self.response_model_exclude_none = response_model_exclude_none
         if enable_req_log:
             self.route_class = APIRouteLoggerHandler
+
+    def add_api_route(self, path: str, endpoint, **kwargs):
+        kwargs.update(response_model_exclude_none=self.response_model_exclude_none)
+        return super().add_api_route(path, endpoint, **kwargs)
 
 
 root_route = APIRouter()
@@ -29,7 +40,7 @@ def register_all_routes(app):
 
         version_modules = importlib.import_module(name)
         api_prefix = getattr(version_modules, "API_PREFIX", name.split(".")[-1])
-        
+
         for _, submodule_name, _ in pkgutil.iter_modules(
             version_modules.__path__, prefix=name + "."
         ):

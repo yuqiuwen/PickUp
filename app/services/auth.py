@@ -276,14 +276,21 @@ class AuthService:
             code = data.code
             if not code:
                 raise AuthException(errmsg="验证码不能为空")
-            if self.auth_type == AuthType.PHONE:
-                await VerifyCodeCache(SMSSendBiz.SET_PWD, user.phone).validate(code)
-            elif self.auth_type == AuthType.EMAIL:
-                await VerifyCodeCache(SMSSendBiz.SET_PWD, user.email).validate(code)
-            elif self.auth_type == AuthType.ACCOUNT:
-                await VerifyCodeCache(SMSSendBiz.SET_PWD, user.account).validate(code)
-            else:
-                raise AuthException(errmsg="不支持的验证方式")
+
+            match self.auth_type:
+                case AuthType.PHONE:
+                    verify_account = user.phone
+                case AuthType.EMAIL:
+                    verify_account = user.email
+                case AuthType.ACCOUNT:
+                    verify_account = user.account
+                case _:
+                    raise AuthException(errmsg="不支持的验证方式")
+
+            if not verify_account:
+                raise AuthException(errmsg="验证账号不存在")
+            await VerifyCodeCache(SMSSendBiz.SET_PWD, verify_account).validate(code)
+
         user.password = data.new_pwd
         await session.commit()
         return user

@@ -12,13 +12,16 @@ from sqlalchemy import (
     Identity,
     Date,
     DateTime,
+    Time,
     Index,
     DECIMAL,
     UniqueConstraint,
     Float,
+    ARRAY,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.mutable import MutableList, MutableDict
+from sqlalchemy.dialects.postgresql import JSONB
 
 from .base import *
 from ._mixin import BaseMixin

@@ -119,6 +119,7 @@ class UserSchema(EntityModel):
     username: str
     account: str | None
     birth: date | None
+    gender: int | None
     phone: str | None
     email: EmailStr | None
     title: str | None
