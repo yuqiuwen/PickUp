@@ -3,14 +3,32 @@ from typing import Annotated, Any
 from pydantic import BaseModel, Field, ConfigDict, TypeAdapter, BeforeValidator, field_validator
 from pydantic import EmailStr
 
-from app.constant import SMSSendBiz
+from app.constant import MediaType, SMSSendBiz
 from app.core.exception import ValidateError
-from app.utils.common import check_phone
+from app.utils.common import check_phone, parse_sort_str
 
 
-class PageModel(BaseModel):
+class PageQueryModel(BaseModel):
     page: int = Field(1, ge=1)
     limit: int = Field(20, gt=0, le=200)
+
+
+class CursorPageQueryModel(BaseModel):
+    last: Any = Field(0, ge=0)
+    limit: int = Field(20, gt=0, le=200)
+
+
+class OrderByModel(BaseModel):
+    order_by: str = Field(
+        default=None, description="多个排序字段以&分隔，格式：field.asc/desc，如id.desc&ctime.asc"
+    )
+
+    @field_validator("order_by", mode="before")
+    @classmethod
+    def parse_order(cls, value: str) -> str:
+        if not value:
+            return
+        return parse_sort_str(value)
 
 
 class EntityModel(BaseModel):
@@ -88,3 +106,14 @@ class SmsSchema(BaseModel):
 class EmailSchema(BaseModel):
     biz: SMSSendBiz
     email: EmailStr
+
+
+class UpdateMediaSchema(BaseModel):
+    id: str | None = Field(default=None)
+    type: MediaType
+    path: str
+
+
+class TagsSchema(EntityModel):
+    id: str
+    name: str

@@ -1,6 +1,7 @@
 import time
 
 import bcrypt
+from sqlalchemy import outerjoin
 
 from app.constant import GroupRole, UserType
 from app.models.module import *
@@ -52,21 +53,14 @@ class UserDevices(ULIDModel, TSModel):
     device_token = Column(String(255), nullable=False, comment="设备Token")
 
 
-class UserSettings(ULIDModel, TSModel):
+class UserSettings(TSModel):
     """用户设置"""
 
     __tablename__ = "user_settings"
 
-    user_id = Column(BigInteger, nullable=False, comment="用户ID")
-    settings_id = Column(Integer, nullable=False, comment="设置ID SettingsModel.id")
+    user_id = Column(BigInteger, primary_key=True, comment="用户ID")
+    settings_id = Column(Integer, primary_key=True, comment="设置ID SettingsModel.id")
     value = Column(String, comment="设置值, 默认为settings.value")
-
-    settings = relationship(
-        "SettingsModel",
-        lazy="joined",
-        viewonly=True,
-        primaryjoin="UserSettings.settings_id == foreign(SettingsModel.id)",
-    )
 
 
 class ShareGroupModel(ULIDModel, TSModel, BigOperatorModel):
@@ -75,16 +69,17 @@ class ShareGroupModel(ULIDModel, TSModel, BigOperatorModel):
     __tablename__ = "share_group"
 
     owner_id = Column(BigInteger, nullable=False, index=True)
-    name = Column(String(50), nullable=False, comment="共享组名称")
+    name = Column(String(50), nullable=False, index=True, comment="共享组名称")
     description = Column(String(100), comment="描述")
     cover = Column(String(255), comment="封面")
-    max_members = Column(SmallInteger, nullable=False, default=100, comment="最大成员数")
+    max_members = Column(Integer, nullable=False, default=100, comment="最大成员数")
     is_public = Column(SmallInteger, nullable=False, default=1, comment="0私密 1公开")
 
 
-class ShareGroupMemberModel(BaseModel, TSModel):
+class ShareGroupMemberModel(TSModel):
+    """共享组成员"""
+
     __tablename__ = "share_group_member"
-    __table_args__ = (Index("ix_share_group_member_user", "user_id"),)
 
     group_id = Column(String(32), primary_key=True)
     user_id = Column(BigInteger, primary_key=True)

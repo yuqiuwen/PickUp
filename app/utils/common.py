@@ -1,4 +1,6 @@
+from collections import OrderedDict
 import re
+from typing import Sequence
 from email_validator import validate_email, EmailNotValidError
 
 from app.constant import AuthType
@@ -60,3 +62,44 @@ def auto_detect_auth_type(raw: str) -> AuthType | None:
             return AuthType.ACCOUNT
         case _:
             return
+
+
+def parse_sort_str(val: str) -> OrderedDict:
+    """解析查询字符串中的排序条件
+
+    Args:
+        val (str): 多个排序字段以&分隔，模板：{field}.asc或desc，如id.desc&ctime.asc
+
+    Returns:
+        OrderedDict:
+    """
+
+    sort_dic = OrderedDict()
+    for o in val.split("&"):
+        field, sort = o.split(".")
+        sort_dic[field] = sort
+    return sort_dic
+
+
+def diff_sequence_data(
+    new: Sequence, old: Sequence, intersection=False
+) -> tuple[set, set, set] | tuple[set, set]:
+    """比较两个序列的变化：新增、删除、交集
+
+    Args:
+        new (Sequence): 新序列
+        old (Sequence): 旧序列
+        intersection (bool, optional): 是否返回交集. Defaults to False.
+
+    Returns:
+        tuple[set, set, set]: 新增，删除，交集
+    """
+
+    new, old = set(new), set(old)
+    to_add = new - old
+    to_del = old - new
+    if not intersection:
+        return to_add, to_del
+
+    intersection = new & old
+    return to_add, to_del, intersection

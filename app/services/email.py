@@ -3,6 +3,7 @@
 处理邮箱相关的业务逻辑：注册、验证码发送、邮箱绑定等
 """
 
+from datetime import date
 import smtplib
 import secrets
 from email.mime.text import MIMEText
@@ -11,9 +12,11 @@ import ssl
 from typing import Optional
 
 from app.config import settings
-from app.constant import SMSSendBiz
+from app.constant import EmailBizEnum, InviteTargetType, SMSSendBiz
 from app.core.app_code import AppCode
-from app.core.exception import AuthException
+from app.core.exception import AuthException, EmailSendExc
+from app.core.loggers import app_logger
+from app.core.template import templates
 from app.services.cache.sys import VerifyCodeCache
 
 
@@ -26,6 +29,11 @@ class EmailService:
         self.smtp_port = settings.EMAIL_SMTP_PORT
         self.sender_email = settings.EMAIL_SENDER
         self.sender_password = settings.EMAIL_PASSWORD
+        self.app_name = settings.APP_NAME
+
+        self.EMAIL_ACCEPT_ENDPOINT = settings.EMAIL_ACCEPT_ENDPOINT
+        self.EMAIL_DECLINE_ENDPOINT = settings.EMAIL_DECLINE_ENDPOINT
+        self.SIGNUP_SITE_URL = settings.SIGNUP_SITE_URL
 
     def generate_verify_code(self, length: int = 6) -> str:
         """
@@ -55,7 +63,7 @@ class EmailService:
             await self._send_email(
                 to_email=email,
                 subject=self._get_email_subject(biz),
-                body=self._get_email_body(code, biz),
+                body=self._get_verify_code_email_body(code, biz),
             )
         except Exception:
             raise AuthException(code=AppCode.EMAIL_SEND_FAILED, errmsg="邮件发送失败")
@@ -77,6 +85,24 @@ class EmailService:
         except Exception:
             raise AuthException(code=AppCode.VERIFY_CODE_ERROR, errmsg="验证码错误或已过期")
 
+    async def send_anniv_invite_email(
+        self, email: str, inviter: str, invitee: str, title: str, anniv_date: str, **kwargs
+    ):
+        """发送邮件邀请
+
+        Args:
+            email (str): 邮箱
+            inviter (str): 邀请者
+            invitee (str): 被邀请者
+            anniv_date (str): 纪念日日期
+        """
+
+        await self._send_email(
+            to_email=email,
+            subject=self._get_email_subject(EmailBizEnum.INVITE_ANNIV),
+            body=self._get_invite_anniv_email_body(inviter, invitee, title, anniv_date),
+        )
+
     async def _send_email(self, to_email: str, subject: str, body: str):
         """
         实际发送邮件的方法
@@ -86,8 +112,8 @@ class EmailService:
         :param body: 邮件内容
         """
         # 如果没有配置邮件服务，则跳过实际发送（开发环境）
-        if not self.sender_email or not self.sender_password:
-            print(f"[DEV MODE] 邮件验证码发送到 {to_email}: {body}")
+        if not self.sender_email or not self.sender_password or settings.ENV == "development":
+            app_logger.warning(f"[DEV MODE] 邮件验证码发送到 {to_email}: {body}")
             return
 
         # 创建邮件
@@ -96,6 +122,38 @@ class EmailService:
         message["From"] = self.sender_email
         message["To"] = to_email
 
+        part = MIMEText(body, "html", "utf-8")
+        message.attach(part)
+
+        # 发送邮件
+        try:
+            # 或使用smtplib.SMTP方式
+            with smtplib.SMTP(self.smtp_server, self.smtp_port, timeout=30) as server:
+                server.starttls(context=ssl.create_default_context())
+                server.login(self.sender_email, self.sender_password)
+                server.sendmail(self.sender_email, to_email, message.as_string())
+                server.quit()
+        except Exception as e:
+            app_logger.error(f"邮件发送失败: {str(e)}")
+            raise EmailSendExc()
+
+    def _get_email_subject(self, biz: EmailBizEnum) -> str:
+        """
+        根据业务场景获取邮件主题
+
+        :param biz: 业务场景
+        :return: 邮件主题
+        """
+        return biz.desc
+
+    def _get_verify_code_email_body(self, code: str) -> str:
+        """
+        获取邮件正文（验证码）
+
+        :param code: 验证码
+        :param biz: 业务场景
+        :return: 邮件正文
+        """
         # 添加邮件正文
         html_content = f"""
         <html>
@@ -106,7 +164,7 @@ class EmailService:
                         您的验证码是：
                     </p>
                     <div style="font-size: 32px; font-weight: bold; color: #007bff; padding: 20px; background-color: #f8f9fa; border-radius: 5px; display: inline-block;">
-                        {body}
+                        {code}
                     </div>
                     <p style="font-size: 14px; color: #999; margin-top: 20px;">
                         验证码有效期为5分钟，请勿泄露给他人。
@@ -116,47 +174,22 @@ class EmailService:
         </html>
         """
 
-        part = MIMEText(html_content, "html")
-        message.attach(part)
+        return html_content
 
-        # 发送邮件
-        try:
-            # 或使用smtplib.SMTP方式
-            with smtplib.SMTP(self.smtp_server, self.smtp_port, timeout=30) as server:
-                server.ehlo()
-                server.starttls(context=ssl.create_default_context())
-                server.login(self.sender_email, self.sender_password)
-                server.sendmail(self.sender_email, to_email, message.as_string())
-                server.quit()
-        except Exception as e:
-            print(f"邮件发送失败: {str(e)}")
-            raise
+    def _get_invite_anniv_email_body(self, inviter: str, invitee: str, title: str, anniv_date: str):
+        template = templates.env.get_template("email/anniv_invite.html")
+        html_body = template.render(
+            app_name=self.app_name,
+            inviter_name=inviter,
+            invitee_name=invitee,
+            anniversary_title=title,
+            anniversary_date=anniv_date,
+            accept_url=self.EMAIL_ACCEPT_ENDPOINT,
+            decline_url=self.EMAIL_DECLINE_ENDPOINT,
+            year=date.year,
+        )
 
-    def _get_email_subject(self, biz: SMSSendBiz) -> str:
-        """
-        根据业务场景获取邮件主题
-
-        :param biz: 业务场景
-        :return: 邮件主题
-        """
-        subject_mapping = {
-            SMSSendBiz.SIGN: "注册验证码",
-            SMSSendBiz.LOGIN: "登录验证码",
-            SMSSendBiz.SET_PWD: "重置密码验证码",
-            SMSSendBiz.BIND_PHONE: "绑定手机号验证码",
-            SMSSendBiz.REVOKE: "账号注销验证码",
-        }
-        return subject_mapping.get(biz, "验证码")
-
-    def _get_email_body(self, code: str, biz: SMSSendBiz) -> str:
-        """
-        获取邮件正文（验证码）
-
-        :param code: 验证码
-        :param biz: 业务场景
-        :return: 邮件正文
-        """
-        return code
+        return html_body
 
 
 # 创建全局实例

@@ -3,15 +3,15 @@ from app.constant import InviteState
 from app.models.module import *
 
 
-class Invite(ULIDModel, TSModel):
+class InviteModel(ULIDModel, TSModel):
     __tablename__ = "invite"
 
     ttype = Column(SmallInteger, nullable=False, comment="目标对象类型InviteTargetType")
     tid = Column(String, nullable=False, index=True, comment="目标对象ID")
 
     inviter_id = Column(BigInteger, nullable=False, index=True)
-    invitee_email = Column(String(320), nullable=False, index=True)
-    invitee_user_id = Column(BigInteger, nullable=True, index=True, comment="邀请用户ID")
+    invitee_email = Column(String(100), nullable=True, index=True)
+    invitee_user_id = Column(BigInteger, default=0, nullable=True, index=True, comment="邀请用户ID")
     token = Column(
         String(64),
         nullable=False,
@@ -21,7 +21,7 @@ class Invite(ULIDModel, TSModel):
         comment="邮件链接里携带",
     )
     state = Column(SmallInteger, nullable=False, default=InviteState.PENDING, comment="InviteState")
-    expires_at = Column(DateTime(timezone=True), nullable=False)
+    expires_at = Column(Integer, nullable=False)
     responded_at = Column(DateTime(timezone=True))
     message = Column(Text, comment="邀请邮件内容")
     meta = Column(

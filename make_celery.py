@@ -1,9 +1,13 @@
 from celery import Celery
+from kombu import Exchange, Queue
 
-from app.config import settings
-from app.tasks.beat_schedules import BEAT_SCHEDULES
+from load_env import load_env
 
 
+load_env()
+
+from app.config import settings  # noqa
+from app.tasks.beat_schedules import BEAT_SCHEDULES  # noqa
 
 
 def init_celery_app() -> Celery:
@@ -24,8 +28,12 @@ def init_celery_app() -> Celery:
         database_engine_options={
             "echo": settings.SQLALCHEMY_ECHO,
         },
+        task_queues=(
+            Queue("default", Exchange("default"), routing_key="default"),
+            Queue("email-job", Exchange("email-job"), routing_key="email-job"),
+        ),
+        task_default_queue="default",
     )
-
 
     celery.autodiscover_tasks(["app.tasks"])
 

@@ -67,6 +67,9 @@ class RepeatType(IntEnumPro):
     YEARLY = 1, "每年"
     MONTHLY = 2, "每月"
     WEEKLY = 3, "每周"
+    DAILY = 4, "每天"
+    HALF_YEARLY = 11, "每半年"
+    THREE_MONTHLY = 23, "每3个月"
 
 
 class ReminderChannel(IntEnumPro):
@@ -75,13 +78,6 @@ class ReminderChannel(IntEnumPro):
     SITE = 1, "站内信"
     EMAIL = 2, "邮件"
     SMS = 3, "短信"
-
-
-class NotificationStatus(IntEnumPro):
-    SCHEDULED = 0, "待发送"
-    SENT = 1, "已送达"
-    FAILED = 2, "失败"
-    CANCELED = 3, "已取消"
 
 
 class AttachmentType(IntEnumPro):
@@ -105,22 +101,14 @@ class GroupRole(IntEnumPro):
     MEMBER = 2, "成员"
 
 
-class SettingsType(IntEnumPro):
-    """系统设置类型"""
-
-    SWITCH = 1, "开关"
-    SELECT = 2, "选项"
-    INPUT = 3, "输入"
-
-
 class SettingsGroup(EnumPro):
-    """系统设置类型"""
+    """系统设置分组"""
 
-    ACCOUNT = 1, "账号设置"
-    GENERIC = 2, "通用设置"
-    NOTIFICATION = 3, "通知设置"
-    PRIVACY = 4, "隐私设置"
-    OTHER = 5, "其他"
+    ACCOUNT = "account", "账号设置"
+    GENERIC = "generic", "通用设置"
+    NOTIFICATION = "notification", "通知设置"
+    PRIVACY = "privacy", "隐私设置"
+    OTHER = "other", "其他"
 
 
 class SettingsSwitch(EnumPro):
@@ -133,11 +121,12 @@ class SettingsSwitch(EnumPro):
 class InviteState(IntEnumPro):
     """邀请状态"""
 
-    PENDING = 0, "待接受"
-    ACCEPTED = 1, "已接受"
-    REJECTED = 2, "已拒绝"
-    EXPIRED = 3, "已过期"
-    CANCELLED = 4, "已撤销"
+    PENDING = 0, "待发送"
+    SENT = 1, "已发送"
+    ACCEPTED = 2, "已接受"
+    DECLINED = 3, "已拒绝"
+    EXPIRED = 4, "已过期"
+    CANCELLED = 5, "已撤销"
 
 
 class InviteTargetType(IntEnumPro):
@@ -154,3 +143,84 @@ class NtfyState(IntEnumPro):
     SENT = 1, "已送达"
     FAILED = 2, "发送失败"
     CANCELED = 3, "已取消"
+
+
+class AnniversaryType(IntEnumPro):
+    """纪念日类型"""
+
+    ANNIVERSARY = 1, "纪念日"
+    BIRTHDAY = 2, "生日"
+    BACKWARD = 3, "倒数日"
+
+
+class MediaType(IntEnumPro):
+    """媒体类型"""
+
+    IMAGE = 1, "图片"
+    VIDEO = 2, "视频"
+    FILE = 3, "文件"
+    LINK = 4, "链接"
+    AUDIO = 5, "音频"
+
+
+class MediaState(IntEnumPro):
+    """媒体状态"""
+
+    UNREVIEWED = -1, "待审核"
+    FAILED = 0, "审核失败"
+    PASSED = 1, "审核通过"
+
+
+class ActionEnum(IntEnumPro):
+    """触发消息事件的行为"""
+
+    LIKE = 1, "点赞"
+    COLLECT = 2, "收藏"
+    COMMENT = 3, "评论"
+    REPLY = 4, "回复"
+    MENTION = 5, "提及"
+    INVITE = 6, "邀请"
+
+    REFUSED_INVITE = -6, "拒绝邀请"
+
+
+class ResourceType(IntEnumPro):
+    ANNIV = 1, "纪念日"
+    NOTES = 2, "笔记"
+
+
+class EmailBizEnum(EnumPro):
+    VERIFY_CODE_SIGN = (
+        "verify_code_sign",
+        "注册验证码",
+    )
+    VERIFY_CODE_LOGIN = (
+        "verify_code_login",
+        "登录验证码",
+    )
+    VERIFY_CODE_SET_PWD = (
+        "verify_code_reset_pwd",
+        "重置密码验证码",
+    )
+    VERIFY_CODE_BIND_PHONE = (
+        "verify_code_bind_phone",
+        "绑定手机号验证码",
+    )
+    VERIFY_CODE_REVOKE = (
+        "verify_code_account_revoke",
+        "账号注销验证码",
+    )
+
+    INVITE_ANNIV = "invite_anniv", "纪念日邀请"
+    INVITE_GROUP = "invite_group", "共享组邀请"
+
+
+class CommentState(IntEnumPro):
+    ENABLED = 1, "启用"
+    DELETED = 0, "删除"
+    DISABLED = -1, "隐藏"
+
+
+class UserInterActionEnum(IntEnumPro):
+    LIKE = 1, "点赞"
+    COLLECT = 2, "收藏"

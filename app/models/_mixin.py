@@ -1,8 +1,10 @@
 from typing import Generic, List, Dict, Union, Literal, Sequence, Mapping
 import time
 
+from sqlalchemy.ext.asyncio import AsyncSession
 from ulid import ULID
 from sqlalchemy import (
+    delete,
     func,
     text,
     select,
@@ -15,7 +17,7 @@ from sqlalchemy import (
     TIMESTAMP,
 )
 from sqlalchemy.orm import joinedload, defer, selectinload, declared_attr, exc, relationship
-from sqlalchemy.dialects.sqlite import insert
+from sqlalchemy.dialects.postgresql import insert
 from fastapi import HTTPException
 
 from app.core.types import Model
@@ -28,19 +30,25 @@ class BaseMixin(Generic[Model]):
     def columns(self):
         return [c.name for c in self.model.__table__.columns]
 
-    async def get(self, session, pk):
+    async def get(self, session: AsyncSession, pk):
         ret = await session.execute(select(self.model).where(self.model.id == pk))
         return ret.scalar_one_or_none()
+
+    async def get_or_404(self, session: AsyncSession, pk):
+        ret = await self.get(session, pk)
+        if not ret:
+            raise HTTPException(status_code=404)
+        return ret
 
     def filter(self, *cond):
         stmt = select(self.model).where(*cond)
         return stmt
 
-    async def filter_one(self, session, *cond):
+    async def filter_one(self, session: AsyncSession, *cond):
         ret = await session.execute(select(self.model).where(*cond))
         return ret.scalars().first()
 
-    async def query_update(self, session, *, cond: Sequence, data: dict):
+    async def query_update(self, session: AsyncSession, *, cond: Sequence, data: dict, commit=True):
         """
         更新数据库中的数据
         :param session: 数据库会话
@@ -48,29 +56,42 @@ class BaseMixin(Generic[Model]):
         :param data: 新数据
         :return: 更新行数
         """
-        ret = await session.execute(update(self.model).where(*cond).values(**data))
+
+        stmt = update(self.model).where(*cond).values(**data)
+        ret = await session.execute(stmt)
+        commit and await session.commit()
         return ret.rowcount
 
-    async def first_or_404(self, session, *cond):
-        ret = (await session.execute(select(self.model).where(*cond))).scalars().first()
+    async def first_or_404(self, session: AsyncSession, *cond, _with_for_update=False):
+        stmt = select(self.model).where(*cond)
+
+        if _with_for_update:
+            stmt = stmt.with_for_update()
+
+        ret = (await session.execute(stmt)).scalar_one_or_none()
+
         if not ret:
             raise HTTPException(status_code=404)
         return ret
 
-    async def create(self, session, data: dict, commit=True, **kwargs):
+    async def create(self, session: AsyncSession, data: dict, commit=True, **kwargs):
         instance = self.model(**data)
         await self.save(session, instance, commit=commit)
         return instance
 
-    async def batch_create(self, session, data: List[Dict], commit=True):
-        await session.run_sync(lambda s: s.bulk_insert_mappings(self.model, data))
+    async def batch_create(self, session: AsyncSession, data: List[Dict], commit=True):
+        if not data:
+            return 0
+        ret = await session.run_sync(lambda s: s.bulk_insert_mappings(self.model, data))
         await session.flush()
         if commit:
             await session.commit()
 
+        return ret
+
     async def batch_update(
         self,
-        session,
+        session: AsyncSession,
         values: List[Dict],
         commit=True,
         handle_unmatch: Literal["raise", "abort", "ignore"] = "abort",
@@ -88,13 +109,15 @@ class BaseMixin(Generic[Model]):
             else:
                 pass
 
-    async def update(self, session, instance: Model, data: dict, commit=True, **kwargs):
+    async def update(
+        self, session: AsyncSession, instance: Model, data: dict, commit=True, **kwargs
+    ):
         for attr, value in data.items():
             setattr(instance, attr, value)
         await self.save(session, instance, commit=commit)
         return instance
 
-    async def save(self, session, instance: Model, commit=True):
+    async def save(self, session: AsyncSession, instance: Model, commit=True):
         try:
             session.add(instance)
             await session.flush()
@@ -106,7 +129,14 @@ class BaseMixin(Generic[Model]):
         else:
             return instance
 
-    async def delete(self, session, instance: Model, commit=True):
+    async def delete(self, session: AsyncSession, *cond, commit=True):
+        ret = await delete(self.model).where(*cond)
+        await session.flush()
+        if commit:
+            await session.commit()
+        return ret
+
+    async def delete_instance(self, session: AsyncSession, instance: Model, commit=True):
         ret = await session.delete(instance)
         await session.flush()
         if commit:
@@ -115,15 +145,15 @@ class BaseMixin(Generic[Model]):
 
     async def insert_or_ignore(
         self,
-        session,
+        session: AsyncSession,
         data: Union[Mapping, Sequence],
-        returning: Sequence = None,
+        returning: Sequence | Model = None,
         constraint=None,
         index_elements=None,
         index_where=None,
         commit=True,
     ):
-        if returning is not None and not isinstance(data, Mapping):
+        if returning is not None and not isinstance(data, (Mapping, Sequence)):
             returning = None
 
         stmt = (
@@ -132,12 +162,18 @@ class BaseMixin(Generic[Model]):
             .on_conflict_do_nothing(constraint, index_elements, index_where)
         )
         if returning:
-            stmt = stmt.returning(returning)
+            if isinstance(returning, Sequence):
+                stmt = stmt.returning(*returning)
+            else:
+                stmt = stmt.returning(returning)
 
         ret = await session.execute(stmt)
-        if returning and isinstance(data, Mapping):
-            ret = ret.first()
-            ret = ret and ret[0]
+        if returning:
+            if isinstance(data, Mapping):
+                ret = ret.first()
+                ret = ret and ret[0]
+            else:
+                ret = ret.all()
         else:
             ret = ret.rowcount
 
@@ -148,7 +184,7 @@ class BaseMixin(Generic[Model]):
 
     async def insert_do_update(
         self,
-        session,
+        session: AsyncSession,
         data: Union[Mapping, Sequence],
         constraint=None,
         index_elements: list = None,
@@ -187,9 +223,12 @@ class BaseMixin(Generic[Model]):
                 do_update_stmt = do_update_stmt.returning(*returning)
 
             ret = await session.execute(do_update_stmt)
-            if returning and isinstance(data, Mapping):
-                ret = ret.first()
-                ret = ret and ret[0]
+            if returning:
+                if isinstance(data, Mapping):
+                    ret = ret.first()
+                    ret = ret and ret[0]
+                else:
+                    ret = ret.all()
             else:
                 ret = ret.rowcount
 
@@ -205,7 +244,7 @@ class BaseMixin(Generic[Model]):
 
     @classmethod
     async def execute_sql(
-        cls, session, sql: str, *, params: dict = None, query_one: bool = False
+        cls, session: AsyncSession, sql: str, *, params: dict = None, query_one: bool = False
     ) -> Union[dict, list[dict]]:
         sql = text(sql)
         cursor_result = await session.execute(sql, params)

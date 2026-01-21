@@ -7,20 +7,10 @@ from pathlib import Path
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
-from dotenv import load_dotenv
+from load_env import load_env
 
 
-def load_env(cfg_name):
-    if cfg_name in ("production",):
-        return
-
-    env_dic = {"development": ".env", "testing": ".env.test", "unittest": ".env.unittest"}
-    envfile = env_dic.get(cfg_name)
-    env_path = str(Path(__file__).parent.parent / envfile)
-    load_dotenv(dotenv_path=env_path, override=True)
-
-
-load_env(os.getenv("APP_ENV", "development"))
+app_env = load_env()
 
 
 from app.config import settings  # noqa
@@ -70,7 +60,19 @@ def include_object(object, name, type_, reflected, compare_to):
     :param compare_to: 与之比较的对象,没有则是None
     :return: bool
     """
-    return not reflected  # 只反射本地模型数据,不反射数据库中的表
+
+    # 不管理 alembic_version
+    if type_ == "table" and name == "alembic_version":
+        return False
+
+    # 禁止 autogenerate 生成 “删表/删列”
+    # 条件：对象来自 DB(reflected=True)，且模型里没有(compare_to is None)
+    if reflected and compare_to is None and type_ in {"table", "column"}:
+        return False
+
+    # 允许索引被对比（因此模型删了索引时，能生成 drop_index）
+    # type_ == "index" 时保持 True 即可
+    return True
 
 
 def run_migrations_offline() -> None:

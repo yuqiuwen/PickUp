@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 import time
 from sqlalchemy import (
     Integer,
+    MetaData,
     SmallInteger,
     String,
     BigInteger,
@@ -16,13 +17,22 @@ from sqlalchemy.schema import Column
 from ulid import ULID
 
 
-Base = declarative_base()
+convention = {
+    "ix": "ix_%(table_name)s_%(column_0_N_label)s",  # Index
+    "uq": "uq_%(table_name)s_%(column_0_N_name)s",  # Unique Constraint
+    "ck": "ck_%(table_name)s_%(constraint_name)s",  # Check Constraint
+    "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",  # Foreign
+    "pk": "pk_%(table_name)s",  # primary key
+}
+
+metadata = MetaData(naming_convention=convention)
+Base = declarative_base(metadata=metadata)
 
 
 class BaseModel(Base):
     __abstract__ = True
 
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, Identity(), primary_key=True)
 
 
 class ULIDModel(Base):
@@ -34,7 +44,7 @@ class ULIDModel(Base):
 class BaseBigModel(BaseModel):
     __abstract__ = True
 
-    id = Column(BigInteger, primary_key=True)
+    id = Column(BigInteger, Identity(), primary_key=True)
 
 
 class TSModel(Base):

@@ -6,7 +6,13 @@ from pydantic.functional_serializers import PlainSerializer
 from slowapi.errors import RateLimitExceeded
 from msgspec import json as msgspec_json
 
-from app.core.exception import APIException, AuthException, DecryptedError, ValidateError
+from app.core.exception import (
+    APIException,
+    AuthException,
+    DecryptedError,
+    PermissionDenied,
+    ValidateError,
+)
 from app.core.loggers import app_logger
 from app.utils.paginator import CursorPaginatedResponse, PaginatedResponse
 
@@ -124,3 +130,9 @@ def register_exc_handler(app):
     @app.exception_handler(RateLimitExceeded)
     async def limit_exc_handler(request, exc: RateLimitExceeded):
         return make_json_response("Rate limit exceeded", code=429, errmsg="操作太快啦，休息一下吧~")
+
+    @app.exception_handler(PermissionDenied)
+    async def permit_denied_exc_handler(request, exc: PermissionDenied):
+        return make_json_response(
+            exc.message or "permission denied", code=exc.code, errmsg=exc.errmsg
+        )

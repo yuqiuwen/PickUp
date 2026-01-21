@@ -17,7 +17,7 @@ services:
     image: pickup
     restart: on-failure:3
     env_file: .env.test
-    command: celery -A app.celery.celery_app worker -P gevent -c 1 -l INFO -f /data/logs/worker.pickup.log
+    command: celery -A make_celery.celery_app worker -P gevent -c 1 -l INFO -f /data/logs/worker.pickup.log
     depends_on:
       - api
 
@@ -25,7 +25,7 @@ services:
     image: pickup
     restart: on-failure:3
     env_file: .env.test
-    command: celery -A app.celery.celery_app beat -l INFO -f /data/logs/beat.pickup.log
+    command: celery -A make_celery.celery_app beat -l INFO -f /data/logs/beat.pickup.log
     volumes:
       - /data/resource/pickup:/data/resource/pickup
     depends_on:

@@ -4,11 +4,14 @@ import platform
 import logging
 from functools import lru_cache
 
-from typing import Pattern
+from typing import Literal, Pattern
 from zoneinfo import ZoneInfo
 from pathlib import Path
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+T_ENV = Literal["development", "testing", "production", "unittest"]
 
 
 def load_config_class():
@@ -51,7 +54,7 @@ class Settings(BaseSettings):
     WHITE_ROUTE_PATTERN: set[Pattern[str]] = set()
 
     APP_NAME: str = os.getenv("APP_NAME", "fast_app").lower()
-    ENV: str = os.getenv("APP_ENV", "development")
+    ENV: T_ENV = os.getenv("APP_ENV", "development")
     TESTING: bool = False
     TIMEZONE: ZoneInfo = ZoneInfo("Asia/Shanghai")
     ENABLE_REQ_LOG: bool = True
@@ -90,7 +93,7 @@ class Settings(BaseSettings):
 
     # Email Service Configuration
     EMAIL_SMTP_SERVER: str = os.getenv("EMAIL_SMTP_SERVER")
-    EMAIL_SMTP_PORT: int = int(os.getenv("EMAIL_SMTP_PORT"))
+    EMAIL_SMTP_PORT: int = int(os.getenv("EMAIL_SMTP_PORT", 0))
     EMAIL_SENDER: str | None = os.getenv("EMAIL_SENDER")
     EMAIL_PASSWORD: str | None = os.getenv("EMAIL_PASSWORD")
 
@@ -111,6 +114,10 @@ class Settings(BaseSettings):
     CELERYBEAT_SCHEDULE_FILENAME: Path = STATIC_DIR / "celerybeat-schedule"
     CELERY_TASK_REJECT_ON_WORKER_LOST: bool = True  # 设为True, worker进程崩掉之后将重新加入worker
     CELERY_WORKER_SEND_TASK_EVENTS: bool = True  # 发送任务相关的事件，便于flower等监控
+
+    EMAIL_ACCEPT_ENDPOINT: str = os.getenv("EMAIL_ACCEPT_ENDPOINT")
+    EMAIL_DECLINE_ENDPOINT: str = os.getenv("EMAIL_ACCEPT_ENDPOINT")
+    SIGNUP_SITE_URL: str = os.getenv("SIGNUP_SITE_URL")
 
 
 class DevelopmentConfig(Settings):

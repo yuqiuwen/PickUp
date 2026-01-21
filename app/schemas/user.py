@@ -16,9 +16,10 @@ from pydantic import (
     validate_email,
 )
 
-from app.constant import AuthType, SMSSendBiz
+from app.constant import AuthType, SMSSendBiz, SettingsGroup
 from app.ext.crypt import pwd_crypto
 from app.core.exception import ValidateError
+from app.models import notification
 from app.schemas.common import EntityModel
 
 from app.utils.common import auto_detect_auth_type, check_phone, hide_phone
@@ -38,6 +39,14 @@ def validate_account(account: str) -> bool:
     if not re.match(r"^[_a-zA-Z0-9-]+$", account):
         raise ValidateError(errmsg="账号只能包含英文、数字、下划线、短横线")
     return True
+
+
+class SimpleUser(EntityModel):
+    id: int
+    username: str
+    account: str | None
+    gender: int | None
+    title: str | None
 
 
 class SignSchema(BaseModel):
@@ -195,3 +204,32 @@ class UpdateUserSchema(BaseModel):
     gender: int | None = Field(default=None, description="性别 0女 / 1男")
     birth: date | None = None
     avatar: str | None = None
+
+
+class ShareGroupMemberSchema(EntityModel):
+    id: str
+    group_id: int
+    role: int
+    user: UserSchema | None
+
+
+class ShareGroupShema(EntityModel):
+    id: str
+    owner_id: int
+    name: str
+    description: str | None
+    cover: str | None
+    max_members: int
+    is_public: int
+
+    members: list[ShareGroupMemberSchema]
+
+
+class UserSettingsItem(BaseModel):
+    settings_id: int
+    name: str
+    label: str
+    value: str | None
+    group: SettingsGroup
+    description: str | None
+    is_default: bool

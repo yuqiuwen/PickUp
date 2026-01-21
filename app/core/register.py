@@ -27,7 +27,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     :param app: FastAPI 应用实例
     :return:
     """
-    
+
     await redis_client.init(enable_redis_socket=settings.ENABLE_SOCKET)
 
     yield
@@ -42,6 +42,7 @@ def register_route(app: FastAPI) -> None:
 def register_ext(app: FastAPI) -> None:
     crypt.init_key()
 
+
 def register_socket_app(app: FastAPI) -> None:
     """
     注册 Socket.IO 应用
@@ -54,9 +55,9 @@ def register_socket_app(app: FastAPI) -> None:
     socket_app = socketio.ASGIApp(
         socketio_server=sio,
         other_asgi_app=app,
-        socketio_path='/ws/socket.io',
+        socketio_path="/ws/socket.io",
     )
-    app.mount('/ws', socket_app)
+    app.mount("/ws", socket_app)
 
 
 def custom_openapi(app: FastAPI):
@@ -81,7 +82,6 @@ def custom_openapi(app: FastAPI):
     # 默认对所有接口应用这个 security（相当于全局需要认证）
     openapi_schema["security"] = [{"BearerAuth": []}]
 
-    app.openapi_schema = openapi_schema
     return openapi_schema
 
 

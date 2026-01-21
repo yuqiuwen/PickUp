@@ -21,9 +21,8 @@ class CursorPaginatedResponse(BaseModel, Generic[T]):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     last: Any
-    has_more: bool
+    has_more: bool = False
     items: List[T] = Field(default_factory=list)
-
 
 
 class Paginator:
@@ -31,7 +30,7 @@ class Paginator:
         self.db = db_session
 
     async def paginate(
-        self, stmt: Select, page: int, page_size: int=None, max_per_page=None
+        self, stmt: Select, page: int, page_size: int = None, max_per_page=None
     ) -> PaginatedResponse:
         """分页查询"""
         if page_size is None:
@@ -54,7 +53,6 @@ class Paginator:
             limit=page_size,
         )
         return ret
-
 
 
 class ScrollPaginator(Paginator):
@@ -118,13 +116,9 @@ class ScrollPaginator(Paginator):
         current_stmt = self.stmt
         if last_score:  # 非首次查询
             if is_reversed:
-                current_stmt = current_stmt.where(
-                    getattr(self.model, self.order_col) < last_score
-                )
+                current_stmt = current_stmt.where(getattr(self.model, self.order_col) < last_score)
             else:
-                current_stmt = current_stmt.where(
-                    getattr(self.model, self.order_col) > last_score
-                )
+                current_stmt = current_stmt.where(getattr(self.model, self.order_col) > last_score)
 
         result = await self.db.execute(current_stmt.limit(limit + 1))
 

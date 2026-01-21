@@ -22,13 +22,17 @@ class AuthException(Exception):
         self.message = message
 
 
-class PermitExceededException(Exception):
+class PermissionDenied(Exception):
     def __init__(self, message="", code: Enum = AppCode.FORBIDDEN, errmsg=None):
         super().__init__(message)
-        self.code = code.value
         if errmsg is None:
             errmsg = "权限不足，无法访问"
+        if message == "":
+            message = "permission denied"
+
+        self.code = code.value
         self.errmsg = errmsg
+
         self.message = message
 
 
@@ -53,3 +57,39 @@ class ResourceLockedExc(Exception):
         super().__init__(message)
         self.errmsg = errmsg
         self.code = code
+
+
+class EmailHandleExc(Exception):
+    def __init__(self, message="", code=AppCode.EMAIL_HANDLE_ERROR, errmsg=""):
+        super().__init__(message)
+        if errmsg is None:
+            errmsg = "操作失败"
+        if message == "":
+            message = "operation failed"
+        self.errmsg = errmsg
+        self.code = code
+        self.message = message
+
+
+class EmailSendExc(Exception):
+    def __init__(self, message="", code=AppCode.EMAIL_SEND_FAILED, errmsg=""):
+        super().__init__(message)
+        if errmsg is None:
+            errmsg = "邮件发送失败"
+        if message == "":
+            message = "email send failed"
+        self.errmsg = errmsg
+        self.code = code
+        self.message = message
+
+
+class UserNotFoundError(Exception):
+    def __init__(self, message="", code=AppCode.USER_NOT_FOUND, errmsg=""):
+        super().__init__(message)
+        if errmsg is None:
+            errmsg = "用户不存在"
+        if message == "":
+            message = "user not found"
+        self.errmsg = errmsg
+        self.code = code
+        self.message = message
