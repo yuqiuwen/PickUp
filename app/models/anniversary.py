@@ -31,6 +31,7 @@ class AnniversaryModel(ULIDModel, TSModel, BigOperatorModel, StateModel):
     owner_id = Column(BigInteger, nullable=False, comment="纪念日归属者ID，拥有该纪念日所有权")
     is_reminder = Column(Boolean, nullable=False, default=False, comment="是否提醒")
     repeat_type = Column(SmallInteger, nullable=False, default=RepeatType.NONE, comment="重复类型")
+    location = Column(String(100), comment="地点")
 
     # LUNAR
     lunar_year = Column(Integer, nullable=True)
@@ -40,6 +41,14 @@ class AnniversaryModel(ULIDModel, TSModel, BigOperatorModel, StateModel):
 
     next_trigger_at = Column(
         DateTime(timezone=True), nullable=False, index=True, comment="下一次触发时间"
+    )
+
+    user = relationship(
+        "User",
+        lazy="joined",
+        viewonly=True,
+        uselist=False,
+        primaryjoin="AnniversaryModel.create_by == foreign(User.id)",
     )
 
     owner = relationship(

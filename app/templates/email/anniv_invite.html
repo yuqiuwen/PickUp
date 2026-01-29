@@ -1,107 +1,169 @@
 <!doctype html>
 <html lang="zh-CN">
-  <head>
-    <meta charset="UTF-8">
-    <title>纪念日邀请</title>
-  </head>
-  <body style="margin:0;padding:0;background-color:#f5f5f5;">
-    <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f5f5;padding:24px 0;">
-      <tr>
-        <td align="center">
-          <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans','PingFang SC','Microsoft YaHei',sans-serif;">
-            <!-- 顶部标题 -->
-            <tr>
-              <td style="background-color:#2b6cb0;color:#ffffff;padding:16px 24px;font-size:18px;font-weight:600;">
-                {{ app_name }} · 纪念日邀请
-              </td>
-            </tr>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="x-apple-disable-message-reformatting">
+  <title>纪念日邀请</title>
+  <style>
+    /* 一些客户端会保留 head 样式；即便被剥离，inline 仍可工作 */
+    body { margin:0 !important; padding:0 !important; background:#f5f5f5; }
+    table { border-collapse:collapse; }
+    a { text-decoration:none; }
+    img { border:0; outline:none; text-decoration:none; }
+    .container { width:600px; max-width:600px; }
+    @media screen and (max-width: 620px) {
+      .container { width:100% !important; }
+      .px { padding-left:16px !important; padding-right:16px !important; }
+      .btn-block { width:100% !important; }
+      .btn-a { display:block !important; width:100% !important; }
+      .stack { display:block !important; width:100% !important; }
+      .mt { padding-top:12px !important; }
+    }
+  </style>
+</head>
 
-            <!-- 正文 -->
-            <tr>
-              <td style="padding:24px 24px 8px 24px;font-size:14px;color:#333333;line-height:1.6;">
-                <p style="margin:0 0 12px 0;">你好{{ '，' + invitee_name if invitee_name else '' }}：</p>
+<body style="margin:0;padding:0;background-color:#f5f5f5;">
+  <!-- Preheader（收件箱预览文案，隐藏） -->
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">
+    {{ inviter_name }} 邀请你一起参与纪念日：{{ anniversary_title }}
+  </div>
 
-                <p style="margin:0 0 12px 0;">
-                  {{ inviter_name }} 在 {{ app_name }} 中创建了一个纪念日，
-                  想邀请你一起参与：
-                </p>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f5f5;padding:24px 0;">
+    <tr>
+      <td align="center" style="padding:0 12px;">
+        <!-- 外层容器 -->
+        <table role="presentation" class="container" width="600" cellpadding="0" cellspacing="0"
+               style="width:600px;max-width:600px;background-color:#ffffff;border:1px solid #eaeaea;border-radius:12px;overflow:hidden;
+                      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans','PingFang SC','Microsoft YaHei',sans-serif;">
 
-                <div style="margin:12px 0;padding:12px 16px;border-radius:6px;background-color:#f7fafc;border:1px solid #e2e8f0;">
-                  <p style="margin:0 0 4px 0;font-size:14px;color:#1a202c;">
-                    <strong>纪念日：</strong>{{ anniversary_title }}
-                  </p>
-                  <p style="margin:0 0 4px 0;font-size:14px;color:#1a202c;">
-                    <strong>日期：</strong>{{ anniversary_date }}
-                  </p>
-                  {% if anniversary_desc %}
-                  <p style="margin:8px 0 0 0;font-size:13px;color:#4a5568;">
-                    <strong>说明：</strong>{{ anniversary_desc }}
-                  </p>
-                  {% endif %}
+          <!-- 顶部栏 -->
+          <tr>
+            <td class="px" style="padding:18px 24px;background:#111827;color:#ffffff;">
+              <div style="font-size:14px;letter-spacing:.2px;opacity:.95;">
+                {{ app_name }}
+              </div>
+              <div style="margin-top:6px;font-size:20px;font-weight:700;line-height:1.2;">
+                纪念日邀请
+              </div>
+            </td>
+          </tr>
+
+          <!-- 正文 -->
+          <tr>
+            <td class="px" style="padding:22px 24px 8px 24px;color:#111827;">
+              <p style="margin:0 0 12px 0;font-size:14px;line-height:1.75;">
+                你好{{ '，' + invitee_name if invitee_name else '' }}：
+              </p>
+
+              <p style="margin:0 0 14px 0;font-size:14px;line-height:1.75;color:#374151;">
+                <strong style="color:#111827;">{{ inviter_name }}</strong> 在 {{ app_name }} 中创建了一个纪念日，想邀请你一起参与。
+              </p>
+
+              <!-- 信息卡片 -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                     style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;">
+                <tr>
+                  <td style="padding:14px 16px;">
+                    <div style="font-size:14px;line-height:1.65;color:#111827;">
+                      <div style="margin:0 0 6px 0;">
+                        <span style="display:inline-block;min-width:56px;color:#6b7280;">纪念日</span>
+                        <strong>{{ anniversary_title }}</strong>
+                      </div>
+                      <div style="margin:0 0 6px 0;">
+                        <span style="display:inline-block;min-width:56px;color:#6b7280;">日期</span>
+                        <span>{{ anniversary_date }}</span>
+                      </div>
+                      {% if anniversary_desc %}
+                      <div style="margin:10px 0 0 0;padding-top:10px;border-top:1px dashed #e5e7eb;color:#374151;font-size:13px;">
+                        <span style="color:#6b7280;">说明：</span>{{ anniversary_desc }}
+                      </div>
+                      {% endif %}
+                    </div>
+                  </td>
+                </tr>
+              </table>
+
+              {% if inviter_message %}
+              <!-- 邀请人留言 -->
+              <div style="margin:16px 0 0 0;">
+                <div style="font-size:13px;color:#6b7280;margin-bottom:8px;">
+                  {{ inviter_name }} 对你说：
                 </div>
-
-                {% if inviter_message %}
-                <p style="margin:16px 0 12px 0;font-size:14px;color:#4a5568;">
-                  <strong>{{ inviter_name }}</strong> 对你说：
-                </p>
-                <div style="margin:0 0 16px 0;padding:10px 14px;border-left:3px solid #cbd5e0;background-color:#f9fafb;font-size:13px;color:#4a5568;">
+                <div style="background:#fff7ed;border:1px solid #fed7aa;border-left:4px solid #fb923c;border-radius:10px;
+                            padding:12px 14px;font-size:13px;line-height:1.7;color:#7c2d12;">
                   {{ inviter_message }}
                 </div>
-                {% endif %}
+              </div>
+              {% endif %}
 
-                <p style="margin:16px 0 12px 0;font-size:14px;color:#333333;">
-                  你可以选择：
-                </p>
+              <div style="margin:18px 0 10px 0;font-size:14px;color:#111827;">
+                请选择你的回应：
+              </div>
 
-                <!-- 按钮区 -->
-                <table cellpadding="0" cellspacing="0" style="margin:0 0 16px 0;">
-                  <tr>
-                    <td>
-                      <a href="{{ accept_url }}"
-                         style="display:inline-block;padding:10px 18px;margin-right:8px;border-radius:4px;
-                                background-color:#2b6cb0;color:#ffffff;text-decoration:none;font-size:14px;">
-                        接受邀请
-                      </a>
-                    </td>
-                    <td>
-                      <a href="{{ decline_url }}"
-                         style="display:inline-block;padding:10px 18px;border-radius:4px;
-                                background-color:#e2e8f0;color:#4a5568;text-decoration:none;font-size:14px;">
-                        拒绝邀请
-                      </a>
-                    </td>
-                  </tr>
-                </table>
+              <!-- 按钮区（bulletproof） -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 8px 0;">
+                <tr>
+                  <td class="stack" valign="top" style="padding-right:8px;" >
+                    <table role="presentation" class="btn-block" width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td align="center" bgcolor="#E9638F" style="border-radius:10px; padding:0;">
+                          <a href="{{ accept_url }}"
+                            style="display:block; padding:12px 18px; font-size:14px; font-weight:700; color:#ffffff;
+                                    text-decoration:none; border-radius:10px; background:#E9638F;">
+                            接受邀请
+                          </a>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
 
-                <p style="margin:0 0 12px 0;font-size:12px;color:#718096;">
-                  如果以上按钮无法点击，请复制以下链接到浏览器中打开：
-                </p>
-                <p style="margin:0 0 4px 0;font-size:12px;color:#4a5568;word-break:break-all;">
-                  接受邀请：<br>
-                  <a href="{{ accept_url }}" style="color:#2b6cb0;">{{ accept_url }}</a>
-                </p>
-                <p style="margin:0 0 16px 0;font-size:12px;color:#4a5568;word-break:break-all;">
-                  拒绝邀请：<br>
-                  <a href="{{ decline_url }}" style="color:#2b6cb0;">{{ decline_url }}</a>
-                </p>
+                  <td class="stack mt" valign="top" style="padding-left:8px;">
+                    <table role="presentation" class="btn-block" width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td align="center" bgcolor="#EEF2F7" style="border-radius:10px; padding:0;">
+                          <a class="btn-a" href="{{ decline_url }}"
+                             style="display:block;padding:12px 18px;font-size:14px;font-weight:700;color:#111827;
+                                    text-decoration:none; border-radius:10px;">
+                            拒绝邀请
+                          </a>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
 
-                <p style="margin:0 0 0 0;font-size:12px;color:#a0aec0;">
-                  如果这不是你本人的操作，可能是他人误填了邮箱，你可以忽略本邮件。
-                </p>
-              </td>
-            </tr>
+              <!-- 备用链接 -->
+              <div style="margin:14px 0 0 0;font-size:12px;line-height:1.7;color:#6b7280;">
+                如果按钮无法点击，请复制链接到浏览器打开：
+              </div>
+              <div style="margin:8px 0 0 0;font-size:12px;line-height:1.6;color:#374151;word-break:break-all;">
+                <div style="margin-bottom:6px;">
+                  接受：<a href="{{ accept_url }}" style="color:#E9638F;">{{ accept_url }}</a>
+                </div>
+                <div>
+                  拒绝：<a href="{{ decline_url }}" style="color:#2563eb;">{{ decline_url }}</a>
+                </div>
+              </div>
 
-            <!-- 底部 -->
-            <tr>
-              <td style="padding:12px 24px 16px 24px;font-size:11px;color:#a0aec0;border-top:1px solid #e2e8f0;">
-                本邮件由 {{ app_name }} 系统自动发送，请勿直接回复。<br>
-                © {{ year }} {{ app_name }} All rights reserved.
-              </td>
-            </tr>
+              <div style="margin:16px 0 0 0;font-size:12px;line-height:1.7;color:#9ca3af;">
+                如果这不是你本人的操作，可能是他人误填了邮箱，你可以忽略本邮件。
+              </div>
+            </td>
+          </tr>
 
-          </table>
-        </td>
-      </tr>
-    </table>
-  </body>
+          <!-- 底部 -->
+          <tr>
+            <td class="px" style="padding:14px 24px 18px 24px;border-top:1px solid #f0f0f0;background:#fafafa;color:#9ca3af;font-size:11px;line-height:1.7;">
+              本邮件由 {{ app_name }} 系统自动发送，请勿直接回复。<br>
+              © {{ year }} {{ app_name }} All rights reserved.
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
 </html>

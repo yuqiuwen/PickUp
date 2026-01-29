@@ -1,8 +1,8 @@
 """
 
-Revision ID: a3d970fe8345
+Revision ID: 987c4414638f
 Revises:
-Create Date: 2026-01-20 14:21:03.588303
+Create Date: 2026-01-21 23:55:36.457663
 
 """
 
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = "a3d970fe8345"
+revision: str = "987c4414638f"
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -28,7 +28,8 @@ def upgrade() -> None:
         sa.Column("description", sa.Text(), nullable=True, comment="描述"),
         sa.Column("event_year", sa.Integer(), nullable=False, comment="纪念日年份"),
         sa.Column("event_date", sa.Date(), nullable=False, comment="纪念日日期"),
-        sa.Column("event_time", sa.Time(timezone=True), nullable=False, comment="纪念日时间"),
+        sa.Column("event_time", sa.Time(), nullable=True, comment="纪念日时间"),
+        sa.Column("tz", sa.String(length=64), nullable=False),
         sa.Column("cover", sa.String(length=255), nullable=True, comment="封面"),
         sa.Column("calendar_type", sa.SmallInteger(), nullable=False, comment="日历类型"),
         sa.Column("type", sa.SmallInteger(), nullable=False, comment="纪念日类型 AnniversaryType"),
@@ -41,6 +42,7 @@ def upgrade() -> None:
         ),
         sa.Column("is_reminder", sa.Boolean(), nullable=False, comment="是否提醒"),
         sa.Column("repeat_type", sa.SmallInteger(), nullable=False, comment="重复类型"),
+        sa.Column("location", sa.String(length=100), nullable=True, comment="地点"),
         sa.Column("lunar_year", sa.Integer(), nullable=True),
         sa.Column("lunar_month", sa.SmallInteger(), nullable=True),
         sa.Column("lunar_day", sa.SmallInteger(), nullable=True),
@@ -128,6 +130,37 @@ def upgrade() -> None:
         sa.Column("anniv_id", sa.String(length=32), nullable=False, comment="纪念日ID"),
         sa.Column("tag_id", sa.String(length=32), nullable=False, comment="标签ID"),
         sa.PrimaryKeyConstraint("anniv_id", "tag_id", name=op.f("pk_anniversary_tag")),
+    )
+    op.create_table(
+        "comment",
+        sa.Column("parent_id", sa.BigInteger(), nullable=False, comment="父评论id"),
+        sa.Column("root_id", sa.BigInteger(), nullable=False, comment="根评论id"),
+        sa.Column("rtype", sa.SmallInteger(), nullable=False, comment="评论的资源类型"),
+        sa.Column("rid", sa.String(length=32), nullable=False, comment="评论的资源id"),
+        sa.Column("content", sa.Text(), nullable=True, comment="评论内容"),
+        sa.Column("from_uid", sa.BigInteger(), nullable=False, comment="评论者"),
+        sa.Column("to_uid", sa.BigInteger(), nullable=False, comment="被评论者"),
+        sa.Column("like_cnt", sa.Integer(), nullable=True, comment="点赞数"),
+        sa.Column("dlike_cnt", sa.Integer(), nullable=True, comment="点踩数"),
+        sa.Column("reply_cnt", sa.Integer(), nullable=True, comment="回复数"),
+        sa.Column("ip", sa.String(length=40), nullable=True, comment="ip地址"),
+        sa.Column("state", sa.SmallInteger(), nullable=False, comment="状态 CommentState"),
+        sa.Column("score", sa.DECIMAL(precision=14, scale=6), nullable=True, comment="热度值"),
+        sa.Column("is_top", sa.Boolean(), nullable=False, comment="是否置顶"),
+        sa.Column(
+            "ctime",
+            sa.Integer(),
+            server_default=sa.text("EXTRACT(EPOCH FROM now())::int"),
+            nullable=False,
+        ),
+        sa.Column("id", sa.BigInteger(), sa.Identity(always=False), nullable=False),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_comment")),
+    )
+    op.create_index(op.f("ix_comment_comment_from_uid"), "comment", ["from_uid"], unique=False)
+    op.create_index(op.f("ix_comment_comment_parent_id"), "comment", ["parent_id"], unique=False)
+    op.create_index(op.f("ix_comment_comment_to_uid"), "comment", ["to_uid"], unique=False)
+    op.create_index(
+        "ix_comment_rtype_rid_ctime", "comment", ["rtype", "rid", "ctime"], unique=False
     )
     op.create_table(
         "invite",
@@ -476,6 +509,31 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id", name=op.f("pk_user_device")),
     )
     op.create_table(
+        "user_interaction",
+        sa.Column("action", sa.SmallInteger(), nullable=False, comment="行为，UserInterActionEnum"),
+        sa.Column("rid", sa.String(length=36), nullable=False, comment="资源id"),
+        sa.Column("rtype", sa.SmallInteger(), nullable=False, comment="资源类型 ResourceType"),
+        sa.Column("uid", sa.BigInteger(), nullable=False, comment="用户id"),
+        sa.Column("state", sa.SmallInteger(), nullable=False, comment="状态：1收藏 0取消收藏"),
+        sa.Column("id", sa.String(length=32), nullable=False),
+        sa.Column(
+            "ctime",
+            sa.Integer(),
+            server_default=sa.text("EXTRACT(EPOCH FROM now())::int"),
+            nullable=False,
+        ),
+        sa.Column(
+            "utime",
+            sa.Integer(),
+            server_default=sa.text("EXTRACT(EPOCH FROM now())::int"),
+            nullable=False,
+        ),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_user_interaction")),
+        sa.UniqueConstraint(
+            "action", "rtype", "rid", "uid", name="uq_user_interaction_action_rtype_rid_uid"
+        ),
+    )
+    op.create_table(
         "user_settings",
         sa.Column("user_id", sa.BigInteger(), nullable=False, comment="用户ID"),
         sa.Column("settings_id", sa.Integer(), nullable=False, comment="设置ID SettingsModel.id"),
@@ -501,6 +559,7 @@ def downgrade() -> None:
     """Downgrade schema."""
     # ### commands auto generated by Alembic - please adjust! ###
     op.drop_table("user_settings")
+    op.drop_table("user_interaction")
     op.drop_table("user_device")
     op.drop_table("user")
     op.drop_table("tag")
@@ -531,6 +590,11 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_invite_invite_invitee_user_id"), table_name="invite")
     op.drop_index(op.f("ix_invite_invite_invitee_email"), table_name="invite")
     op.drop_table("invite")
+    op.drop_index("ix_comment_rtype_rid_ctime", table_name="comment")
+    op.drop_index(op.f("ix_comment_comment_to_uid"), table_name="comment")
+    op.drop_index(op.f("ix_comment_comment_parent_id"), table_name="comment")
+    op.drop_index(op.f("ix_comment_comment_from_uid"), table_name="comment")
+    op.drop_table("comment")
     op.drop_table("anniversary_tag")
     op.drop_table("anniversary_member")
     op.drop_table("anniversary_media")

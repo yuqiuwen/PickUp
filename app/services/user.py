@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.ext.jwt import TokenUserInfo
 from app.models.user import ShareGroupModel, User
 from app.repo.user import UserRepo, share_group_repo, user_repo, user_settings_repo
-from app.schemas.user import UpdateUserSchema, UserSchema
+from app.schemas.user import GroupMemberOptions, UpdateUserSchema, UserSchema
 
 
 class UserService:
@@ -103,8 +103,22 @@ class UserService:
         return {i.id: i.owner_id for i in query}
 
     @staticmethod
-    async def get_user_name_mapping(session, uids: list[int]):
-        data: User = await user_repo.list_by_uid(session, uids, only_cols=[User.id, User.username])
-        ret = {u.id: u.username for u in data}
-
+    async def get_user_mapping(session, uids: list[int]) -> dict[int, User]:
+        data: User = await user_repo.list_by_uid(session, uids, only_cols=UserRepo.BASE_USER_COLS)
+        ret = {u.id: u for u in data}
         return ret
+
+    @staticmethod
+    async def get_group_list(session, search: str):
+        items = await share_group_repo.list(session, kw=search)
+        return items
+
+    @staticmethod
+    async def get_member_list(session, search: str):
+        items = await user_repo.list(session, kw=search, only_cols=UserRepo.BASE_USER_COLS)
+        return items
+
+    async def get_group_member_list(self, session, search: str):
+        groups = await self.get_group_list(session, search)
+        members = await self.get_member_list(session, search)
+        return GroupMemberOptions(groups=groups, members=members)

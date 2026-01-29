@@ -4,6 +4,7 @@
 """
 
 from datetime import date
+import datetime
 import smtplib
 import secrets
 from email.mime.text import MIMEText
@@ -29,10 +30,9 @@ class EmailService:
         self.smtp_port = settings.EMAIL_SMTP_PORT
         self.sender_email = settings.EMAIL_SENDER
         self.sender_password = settings.EMAIL_PASSWORD
-        self.app_name = settings.APP_NAME
+        self.app_name = "pickup"
 
-        self.EMAIL_ACCEPT_ENDPOINT = settings.EMAIL_ACCEPT_ENDPOINT
-        self.EMAIL_DECLINE_ENDPOINT = settings.EMAIL_DECLINE_ENDPOINT
+        self.WEB_BASE_URL = settings.WEB_BASE_URL
         self.SIGNUP_SITE_URL = settings.SIGNUP_SITE_URL
 
     def generate_verify_code(self, length: int = 6) -> str:
@@ -86,7 +86,14 @@ class EmailService:
             raise AuthException(code=AppCode.VERIFY_CODE_ERROR, errmsg="验证码错误或已过期")
 
     async def send_anniv_invite_email(
-        self, email: str, inviter: str, invitee: str, title: str, anniv_date: str, **kwargs
+        self,
+        email: str,
+        inviter: str,
+        invitee: str,
+        title: str,
+        anniv_date: datetime,
+        token: str,
+        **kwargs,
     ):
         """发送邮件邀请
 
@@ -100,7 +107,7 @@ class EmailService:
         await self._send_email(
             to_email=email,
             subject=self._get_email_subject(EmailBizEnum.INVITE_ANNIV),
-            body=self._get_invite_anniv_email_body(inviter, invitee, title, anniv_date),
+            body=self._get_invite_anniv_email_body(inviter, invitee, title, anniv_date, token),
         )
 
     async def _send_email(self, to_email: str, subject: str, body: str):
@@ -112,8 +119,8 @@ class EmailService:
         :param body: 邮件内容
         """
         # 如果没有配置邮件服务，则跳过实际发送（开发环境）
-        if not self.sender_email or not self.sender_password or settings.ENV == "development":
-            app_logger.warning(f"[DEV MODE] 邮件验证码发送到 {to_email}: {body}")
+        if not self.sender_email or not self.sender_password:
+            app_logger.warning(f"[DEV MODE] 邮件发送到 {to_email}: {body}")
             return
 
         # 创建邮件
@@ -176,7 +183,9 @@ class EmailService:
 
         return html_content
 
-    def _get_invite_anniv_email_body(self, inviter: str, invitee: str, title: str, anniv_date: str):
+    def _get_invite_anniv_email_body(
+        self, inviter: str, invitee: str, title: str, anniv_date: datetime, token: str
+    ):
         template = templates.env.get_template("email/anniv_invite.html")
         html_body = template.render(
             app_name=self.app_name,
@@ -184,9 +193,9 @@ class EmailService:
             invitee_name=invitee,
             anniversary_title=title,
             anniversary_date=anniv_date,
-            accept_url=self.EMAIL_ACCEPT_ENDPOINT,
-            decline_url=self.EMAIL_DECLINE_ENDPOINT,
-            year=date.year,
+            accept_url=f"{self.WEB_BASE_URL}/{settings.EMAIL_ACCEPT_URL.format(token=token)}",
+            decline_url=f"{self.WEB_BASE_URL}/{settings.EMAIL_DECLINE_URL.format(token=token)}",
+            year=date.today().year,
         )
 
         return html_body

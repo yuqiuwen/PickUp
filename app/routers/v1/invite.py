@@ -1,13 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Literal
+from typing import Any, Literal
 
 from app.config import settings
 from app.constant import InviteState
-from app.core.dependencies import SessionDep
+from app.core.dependencies import RequireAuthDep, SessionDep
 from app.core.exception import APIException, PermissionDenied, UserNotFoundError
+from app.core.http_handler import RespModel, make_response
 from app.routers import BaseAPIRouter
+from app.schemas.invite import InviteItem
 from app.services.invite import InviteService
 
 
@@ -43,3 +45,32 @@ async def handle_invite_from_email(
 
     # 方式2：也可以重定向到前端某个页面（如 App H5）
     # return RedirectResponse(f"https://your-frontend.com/anniversaries/invites/result?status={result.status}")
+
+
+@router.post("/accept", response_model=RespModel[Any])
+async def accept_invite(session: SessionDep, user: RequireAuthDep, token: str = Body(embed=True)):
+    await InviteService.handle_invite(
+        session=session,
+        raw_token=token,
+        cur_user=user,
+        action="accept",
+    )
+    return make_response()
+
+
+@router.post("/decline")
+async def decline_invite(session: SessionDep, user: RequireAuthDep, token: str):
+    await InviteService.handle_invite(
+        session=session,
+        raw_token=token,
+        cur_user=user,
+        action="decline",
+    )
+    return make_response()
+
+
+@router.get("/preview", response_model=RespModel[InviteItem])
+async def preview_invite(session: SessionDep, token: str):
+    item = await InviteService.preview_invite(session, token)
+
+    return make_response(data=item)

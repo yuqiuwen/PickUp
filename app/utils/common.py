@@ -1,5 +1,7 @@
 from collections import OrderedDict
+import hashlib
 import re
+import secrets
 from typing import Sequence
 from email_validator import validate_email, EmailNotValidError
 
@@ -103,3 +105,11 @@ def diff_sequence_data(
 
     intersection = new & old
     return to_add, to_del, intersection
+
+
+def gen_urlsafe_token(length=32) -> str:
+    return secrets.token_urlsafe(length)
+
+
+def hash_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()

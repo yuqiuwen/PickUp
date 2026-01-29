@@ -1,6 +1,6 @@
 import re
 from datetime import date
-from typing import Literal, Tuple, Annotated
+from typing import List, Literal, Tuple, Annotated
 from typing_extensions import Self
 
 from pydantic import (
@@ -43,6 +43,7 @@ def validate_account(account: str) -> bool:
 
 class SimpleUser(EntityModel):
     id: int
+    avatar: str | None
     username: str
     account: str | None
     gender: int | None
@@ -222,7 +223,7 @@ class ShareGroupShema(EntityModel):
     max_members: int
     is_public: int
 
-    members: list[ShareGroupMemberSchema]
+    members: list[ShareGroupMemberSchema] = Field(default_factory=list)
 
 
 class UserSettingsItem(BaseModel):
@@ -233,3 +234,8 @@ class UserSettingsItem(BaseModel):
     group: SettingsGroup
     description: str | None
     is_default: bool
+
+
+class GroupMemberOptions(EntityModel):
+    groups: List[ShareGroupShema] | None = Field(default_factory=list)
+    members: List[SimpleUser] | None = Field(default_factory=list)

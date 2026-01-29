@@ -1,3 +1,4 @@
+from collections import defaultdict
 from typing import List
 from redis import retry
 from sqlalchemy import BigInteger, and_, cast, delete, exists, or_, select
@@ -16,10 +17,17 @@ from app.models.anniversary import (
     ReminderSlot,
 )
 from app.models.base import StateModel
+from app.models.sys import MediaModel
 from app.models.tags import TagModel
 from app.repo.media import media_repo
-from app.repo.user import share_group_repo
-from app.schemas.anniversary import CreateTagSchema, QueryAnnivSchema, RemindRuleSchema
+from app.repo.tags import tag_repo
+from app.repo.user import share_group_repo, user_repo
+from app.schemas.anniversary import (
+    AnnivMemberSchema,
+    CreateTagSchema,
+    QueryAnnivSchema,
+    RemindRuleSchema,
+)
 from app.schemas.common import UpdateMediaSchema
 from app.utils.common import diff_sequence_data, parse_sort_str
 from app.utils.dater import DT
@@ -33,22 +41,25 @@ class AnnivMemberRepo(BaseMixin[AnniversaryMemberModel]):
         )
         return ret
 
+    async def list_anniv_member(self, session, anniv_id: str) -> AnnivMemberSchema:
+        stmt = select(self.model).where(self.model.anniv_id == anniv_id)
+        anniv_member_query = (await session.execute(stmt)).scalars().all()
+        gids, uids = [], []
+        ret = AnnivMemberSchema()
+        for i in anniv_member_query:
+            if i.ttype == 1:  # group
+                gids.append(i.tid)
+            elif i.ttype == 2:  # member
+                uids.append(i.tid)
 
-class TagRepo(BaseMixin[TagModel]):
-    async def edit(
-        self, session, create_by: int, data: List[CreateTagSchema], commit=True
-    ) -> list[dict]:
-        if not data:
-            return []
-        data = [{"name": item.name, "create_by": create_by} for item in data]
-        items = await self.insert_or_ignore(
-            session,
-            data,
-            index_elements=["name"],
-            returning=(self.model.id, self.model.name),
-            commit=commit,
-        )
-        return [{"id": item.id, "name": item.name} for item in items]
+        if gids:
+            ret.groups = await share_group_repo.list(session, group_id=gids)
+        if uids:
+            ret.users = await user_repo.list_by_uid(
+                session, uids, only_cols=user_repo.BASE_USER_COLS
+            )
+
+        return ret
 
 
 class AnnivRepo(BaseMixin[AnniversaryModel]):
@@ -56,13 +67,19 @@ class AnnivRepo(BaseMixin[AnniversaryModel]):
         item = await self.create(session, data, commit=commit)
         return item
 
-    async def get_share_stmt(self, session, cur_user_id):
+    async def get_share_stmt(self, session, cur_user_id, anniv_ids: List[str] | str = None):
         exist_cond = []
+        if anniv_ids:
+            if isinstance(anniv_ids, str):
+                exist_cond.append(AnniversaryMemberModel.anniv_id == anniv_ids)
+            else:
+                exist_cond.append(AnniversaryMemberModel.anniv_id.in_(anniv_ids))
+
         share_group_ids = await share_group_repo.list_me_joined_group_ids(session, cur_user_id)
         where_stmt_member = and_(
             AnniversaryMemberModel.ttype == 2, AnniversaryMemberModel.tid == str(cur_user_id)
         )
-        exist_cond.append(where_stmt_member)
+
         if share_group_ids:
             where_stmt_group = and_(
                 AnniversaryMemberModel.ttype == 1, AnniversaryMemberModel.tid.in_(share_group_ids)
@@ -73,11 +90,49 @@ class AnnivRepo(BaseMixin[AnniversaryModel]):
                     where_stmt_group,
                 )
             )
+        else:
+            exist_cond.append(where_stmt_member)
 
         member_or_group_exists = exists(select(1).where(*exist_cond))
         return member_or_group_exists
 
-    async def list_feed(self, session: AsyncSession, cur_user_id: int, params: QueryAnnivSchema):
+    async def retrieve_or_404(self, session, anniv_id: str, user_id: int = None):
+        cond = [self.model.state == 1, self.model.id == anniv_id]
+        if user_id:
+            cond.append(self.model.owner_id == user_id)
+
+        item = await self.first_or_404(session, *cond)
+        return item
+
+    async def retrieve(self, session, anniv_id: str, user_id: int = None):
+        cond = [self.model.state == 1, self.model.id == anniv_id]
+        if user_id:
+            cond.append(self.model.owner_id == user_id)
+
+        item = await self.first_or_404(session, *cond)
+        return item
+
+    async def retrieve_my_anniv(self, session, user_id: int, anniv_id: str, include_share=True):
+        if not include_share:
+            item = await self.retrieve_or_404(session, anniv_id, user_id)
+            return item
+
+        cond = [self.model.state == 1, self.model.id == anniv_id]
+        if include_share:
+            member_or_group_exists = await self.get_share_stmt(session, user_id, anniv_ids=anniv_id)
+            cond.append(
+                or_(
+                    self.model.owner_id == user_id,
+                    and_(self.model.share_mode == 1, member_or_group_exists),
+                )
+            )
+
+            item = await self.first_or_404(session, *cond)
+            return item
+
+    async def list_feed(
+        self, session: AsyncSession, cur_user_id: int, params: QueryAnnivSchema
+    ) -> CursorPaginatedResponse[AnniversaryModel]:
         """list feeds, include:
         owner + share member + share group
 
@@ -94,6 +149,9 @@ class AnnivRepo(BaseMixin[AnniversaryModel]):
 
         if params.type is not None and params.type != "all":
             cond.append(self.model.type == int(params.type))
+
+        if params.name:
+            cond.append(self.model.name.ilike(f"%{params.name}%"))
 
         if params.order_by == "default":
             orders = (
@@ -122,7 +180,6 @@ class AnnivRepo(BaseMixin[AnniversaryModel]):
                 ),
             )
             .order_by(*orders, self.model.id.desc())
-            .limit(1000)
         )
 
         query = (await session.execute(stmt)).scalars().all()
@@ -144,29 +201,26 @@ class AnnivRepo(BaseMixin[AnniversaryModel]):
         total = (await session.execute(stmt)).scalar() or 0
         return total
 
-    async def get_next(self, session, cur_user_id: int):
+    async def get_next(self, session, cur_user_id: int, days=45):
+        now = DT.now_time()
         member_or_group_exists = await self.get_share_stmt(session, cur_user_id)
         stmt = (
             select(self.model)
             .where(
                 self.model.state == 1,
-                self.model.next_trigger_at >= DT.now_ts(),
-                self.model.repeat_type == RepeatType.NONE,
+                self.model.next_trigger_at >= now,
+                self.model.next_trigger_at <= DT.after_n_day(days),
                 or_(
                     self.model.owner_id == cur_user_id,
                     and_(self.model.share_mode == 1, member_or_group_exists),
                 ),
             )
             .order_by(self.model.next_trigger_at)
-            .limit(1)
+            .limit(3)
         )
 
         result = await session.execute(stmt)
-        return result.scalar_or_none()
-
-    async def retrieve_or_404(self, session, anniv_id: str):
-        item = await self.first_or_404(self.model.state == 1, self.model.id == anniv_id)
-        return item
+        return result.scalars().all()
 
     async def add_tag(
         self, session, anniv_id: str, create_by: int, tags: List[CreateTagSchema], commit=True
@@ -213,6 +267,23 @@ class AnnivRepo(BaseMixin[AnniversaryModel]):
 
         return to_add_data
 
+    async def list_tag(self, session: AsyncSession, anniv_ids: List[str], as_mapping=True):
+        stmt = (
+            select(AnniversaryTag.anniv_id, TagModel.id, TagModel.name)
+            .select_from(TagModel)
+            .join(AnniversaryTag, TagModel.id == AnniversaryTag.tag_id)
+            .where(TagModel.state == 1, AnniversaryTag.anniv_id.in_(anniv_ids))
+        )
+        result = await session.execute(stmt)
+        data = result.all()
+        if not as_mapping:
+            return data
+
+        grouped_dict = defaultdict(list)
+        for item in data:
+            grouped_dict[item.anniv_id].append(item._asdict())
+        return grouped_dict
+
     async def add_media(self, session, anniv_id: str, media: List[UpdateMediaSchema], commit=True):
         new_media = await media_repo.edit(session, [i for i in media if not i.id], commit=False)
         media_ids = {i.id for i in media if i.id} | {i["id"] for i in new_media}
@@ -253,6 +324,28 @@ class AnnivRepo(BaseMixin[AnniversaryModel]):
         commit and await session.commit()
 
         return to_add_data
+
+    async def list_media(self, session, anniv_ids: List[str], as_mapping=True):
+        stmt = (
+            select(
+                AnnivMediaModel.anniv_id,
+                MediaModel.id,
+                MediaModel.type,
+                MediaModel.path,
+                MediaModel.utime,
+            )
+            .select_from(AnnivMediaModel)
+            .join(MediaModel, MediaModel.id == AnnivMediaModel.media_id)
+            .where(AnnivMediaModel.anniv_id.in_(anniv_ids))
+        )
+        result = await session.execute(stmt)
+        data = result.all()
+        if not as_mapping:
+            return data
+        grouped_dict = defaultdict(list)
+        for item in data:
+            grouped_dict[item.anniv_id].append(item._asdict())
+        return grouped_dict
 
 
 class RemindRepo(BaseMixin[ReminderRule]):
@@ -301,7 +394,6 @@ class RemindRepo(BaseMixin[ReminderRule]):
         commit and await session.commit()
 
 
-tag_repo = TagRepo(TagModel)
 anniv_member_repo = AnnivMemberRepo(AnniversaryMemberModel)
 anniv_repo = AnnivRepo(AnniversaryModel)
 remind_repo = RemindRepo(ReminderRule)

@@ -74,6 +74,7 @@ class Settings(BaseSettings):
     TOKEN_SECRET_KEY: str = os.getenv("TOKEN_SECRET_KEY")  # secrets.token_urlsafe(32)
     COOKIE_REFRESH_TOKEN_KEY: str = "refresh_token"
     TOKEN_ALGORITHM: str = "HS256"
+    INVITE_TOKEN_SECRET: str = os.getenv("INVITE_TOKEN_SECRET")
 
     API_KEYS: set[str] | None = None
 
@@ -115,9 +116,10 @@ class Settings(BaseSettings):
     CELERY_TASK_REJECT_ON_WORKER_LOST: bool = True  # 设为True, worker进程崩掉之后将重新加入worker
     CELERY_WORKER_SEND_TASK_EVENTS: bool = True  # 发送任务相关的事件，便于flower等监控
 
-    EMAIL_ACCEPT_ENDPOINT: str = os.getenv("EMAIL_ACCEPT_ENDPOINT")
-    EMAIL_DECLINE_ENDPOINT: str = os.getenv("EMAIL_ACCEPT_ENDPOINT")
-    SIGNUP_SITE_URL: str = os.getenv("SIGNUP_SITE_URL")
+    WEB_BASE_URL: str = os.getenv("WEB_BASE_URL")
+    EMAIL_ACCEPT_URL: str = os.getenv("EMAIL_ACCEPT_URL")
+    EMAIL_DECLINE_URL: str = os.getenv("EMAIL_ACCEPT_URL")
+    SIGNUP_SITE_URL: str = WEB_BASE_URL + os.getenv("SIGNUP_URL")
 
 
 class DevelopmentConfig(Settings):
@@ -133,7 +135,7 @@ class DevelopmentConfig(Settings):
     DB_MAIN_TEST_URL: str | None = os.getenv("DB_MAIN_TEST_URL")
 
     # 本地自测，同步执行
-    CELERY_TASK_ALWAYS_EAGER: bool = True
+    CELERY_TASK_ALWAYS_EAGER: bool = False
 
 
 class TestingConfig(Settings):

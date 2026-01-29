@@ -1,4 +1,4 @@
-from typing import Sequence
+from typing import List, Sequence
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,7 +23,7 @@ class InviteRepo(BaseMixin[InviteModel]):
         tid: str = None,
         state: InviteState | list[InviteState] | None = None,
         expires_at_range: Sequence[None | int] = None,
-    ) -> list[InviteModel]:
+    ) -> List[InviteModel]:
         cond = []
         if ttype is not None:
             cond.append(self.model.ttype == ttype)
@@ -42,9 +42,9 @@ class InviteRepo(BaseMixin[InviteModel]):
                 cond.append(self.model.expires_at <= max_expires_at)
 
         stmt = self.filter(*cond)
-        ret = await session.execute(stmt).scalars().all()
+        ret = await session.execute(stmt)
 
-        return ret
+        return ret.scalars().all()
 
     async def retrieve(self, session, invite_id: str = None, token: str = None) -> InviteModel:
         cond = []
@@ -54,6 +54,11 @@ class InviteRepo(BaseMixin[InviteModel]):
             cond.append(InviteModel.token == token)
         item = await self.first_or_404(session, *cond, _with_for_update=True)
         return item
+
+    async def edit_state(self, session, invite_id: str, state: InviteState, commit=True):
+        cond = [self.model.id == invite_id]
+        data = {"state": state}
+        return await self.query_update(session, cond=cond, data=data, commit=commit)
 
 
 invite_repo = InviteRepo(InviteModel)

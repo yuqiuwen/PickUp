@@ -1,9 +1,16 @@
+from datetime import datetime
 import secrets
 from time import time
+import traceback
 from typing import Literal
 
 from fastapi import HTTPException
+from jose import jwt, JWTError, ExpiredSignatureError
 from redis import retry
+from ulid import ULID
+
+from app.config import settings
+from app.config.setting_config import SettingEnum
 from app.constant import AnniversaryType, InviteState, InviteTargetType, SettingsSwitch
 from app.core.exception import APIException, PermissionDenied, UserNotFoundError
 from app.core.loggers import app_logger
@@ -11,16 +18,38 @@ from app.ext.jwt import TokenUserInfo
 from app.models.invite import InviteModel
 from app.repo.anniversary import anniv_member_repo, anniv_repo
 from app.repo.user import share_group_repo, user_repo
-from app.schemas.anniversary import CreateAnnivSchema, InviteFieldSchema
+from app.schemas.anniversary import AnnivSchema, CreateAnnivSchema, InviteFieldSchema
 from app.repo.invite import invite_repo
+from app.schemas.invite import InviteItem
 from app.services.email import email_service
 from app.services.user import UserService
+from app.utils.common import gen_urlsafe_token, hash_token
 from app.utils.dater import DT
 
 
 class InviteService:
     def __init__(self, ttype: InviteTargetType):
         self.ttype = ttype
+
+    @staticmethod
+    def make_invite_token(
+        *, invite_id: int, invited_email: str, expires_at: int, secret: str
+    ) -> str:
+        payload = {
+            "iid": invite_id,
+            "email": invited_email.lower(),
+            "exp": expires_at,
+            "typ": "invite",
+        }
+        return jwt.encode(payload, secret, algorithm="HS256")
+
+    def parse_invite_token(token: str, secret: str) -> dict:
+        try:
+            return jwt.decode(token, secret, algorithms=["HS256"])
+        except ExpiredSignatureError:
+            raise HTTPException(errmsg="邀请已过期")
+        except JWTError:
+            raise APIException(errmsg="邀请链接无效")
 
     async def create_invite(
         self,
@@ -70,7 +99,7 @@ class InviteService:
                 # 查询用户偏好设置：是否接受纪念日邀请
                 if self.ttype == InviteTargetType.ANNIVERSARY:
                     unaccept_invite = UserService.get_me_one_setting(
-                        user_id, "privacy_unaccept_anniv_invite"
+                        session, user_id, SettingEnum.PRIVACY_UNACCEPT_ANNIV_INVITE.value
                     )
                     if unaccept_invite == SettingsSwitch.ON:
                         return
@@ -79,15 +108,24 @@ class InviteService:
             else:
                 invitee_email = account
 
+            invite_id = str(ULID())
+            expires_at = DT.now_ts() + expires_after
+            token = self.make_invite_token(
+                invite_id=invite_id,
+                invited_email=invitee_email,
+                expires_at=expires_at,
+                secret=settings.INVITE_TOKEN_SECRET,
+            )
             body = {
+                "id": invite_id,
                 "ttype": self.ttype,
                 "tid": tid,
                 "inviter_id": inviter_id,
                 "invitee_user_id": user_id,
                 "invitee_email": invitee_email,
                 "state": InviteState.PENDING,
-                "token": secrets.token_urlsafe(32),
-                "expires_at": DT.now_ts() + expires_after,
+                "token": token,
+                "expires_at": expires_at,
                 "message": data.message,
                 "meta": {"ttype": _ttype, "tid": _tid},
             }
@@ -117,6 +155,11 @@ class InviteService:
         return ret
 
     async def publish_invite_job(self, tid: str):
+        """异步任务-邀请邮件
+
+        Args:
+            tid (str): 纪念日id/组id
+        """
         from app.tasks.anniv_task import send_email_invite
 
         send_email_invite.delay(ttype=self.ttype, tid=tid)
@@ -124,6 +167,7 @@ class InviteService:
     async def process_send_invite(self, session, tid: str):
         # 获取待发送的邀请
         invites: list[InviteModel] = await invite_repo.list(
+            session,
             ttype=self.ttype,
             tid=tid,
             state=InviteState.PENDING,
@@ -133,23 +177,40 @@ class InviteService:
             return
 
         for item in invites:
-            user_ids = [item.inviter_id]
+            user_ids = {item.inviter_id}
             if item.invitee_user_id:
-                user_ids.append(item.invitee_user_id)
+                user_ids.add(item.invitee_user_id)
 
             try:
-                user_name_mapping = await UserService.get_user_name_mapping(session, user_ids)
                 anniv = await anniv_repo.retrieve_or_404(session, item.tid)
+                user_mapping = await UserService.get_user_mapping(session, list(user_ids))
+                inviter = user_mapping.get(item.inviter_id)
+                invitee = user_mapping.get(item.invitee_user_id)
+                if not inviter:
+                    continue
+                if not invitee:
+                    invitee_username = item.invitee_email
+                else:
+                    invitee_username = invitee.username
+
+                # TODO 已注册用户，邮箱不存在，继续发送到站内通知
+                if invitee and not invitee.email:
+                    continue
+
                 await email_service.send_anniv_invite_email(
                     item.invitee_email,
-                    user_name_mapping.get(item.inviter_id, ""),
-                    user_name_mapping.get(item.invitee_user_id, ""),
+                    inviter.username,
+                    invitee_username,
                     anniv.name,
-                    anniv.event_date,
+                    anniv.next_trigger_at,
+                    item.token,
                 )
             except Exception as e:
+                traceback.print_exc()
                 app_logger.error(f"邀请邮件发送失败：{e}")
                 continue
+            else:
+                await invite_repo.edit_state(session, item.id, InviteState.SENT)
 
     @staticmethod
     async def handle_invite(
@@ -159,9 +220,10 @@ class InviteService:
         invite_id: str | None = None,
         raw_token: str | None = None,
     ):
-        invite = await invite_repo.retrieve(session, invite_id, raw_token)
+        token_payload = InviteService.parse_invite_token(raw_token, settings.INVITE_TOKEN_SECRET)
+        invite = await invite_repo.retrieve(session, invite_id=token_payload["iid"])
 
-        now = DT.now()
+        now = DT.now_ts()
         if invite.expires_at and now > invite.expires_at:
             raise APIException(errmsg="邮件链接已过期")
 
@@ -176,9 +238,11 @@ class InviteService:
         if invite.state == InviteState.DECLINED and action == "decline":
             raise APIException(errmsg="已拒绝邀请")
 
-        user = UserService.check_user_exist(session, "email", invite.invitee_email)
+        user = await UserService.check_user_exist(session, "email", invite.invitee_email)
         if not user:
             raise UserNotFoundError()
+        if invite.invitee_email and user.email != invite.invitee_email:
+            raise PermissionDenied("email_mismatch")
 
         # 更新状态
         if action == "accept":
@@ -202,7 +266,7 @@ class InviteService:
             invite.state = InviteState.DECLINED
 
         invite.utime = now
-        invite.responded_at = now
+        invite.responded_at = DT.ts2time(now)
 
         await session.commit()
 
@@ -210,3 +274,14 @@ class InviteService:
         # ...
 
         return invite
+
+    @staticmethod
+    async def preview_invite(session, token: str):
+        invite = await invite_repo.retrieve(session, token=token)
+        target = None
+        item = InviteItem.model_validate(invite)
+        if invite.ttype == InviteTargetType.ANNIVERSARY:
+            target = await anniv_repo.retrieve(session, invite.tid)
+            item.target = AnnivSchema.to_dantic_model(target)
+
+        return item

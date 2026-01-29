@@ -6,7 +6,7 @@ from app.schemas.common import TagsSchema
 
 class TagService:
     async def list_tag(session, search: str) -> list[TagsSchema]:
-        data = await tag_repo.list(session, search)
+        data = await tag_repo.list(session, name=search)
 
         return data
 

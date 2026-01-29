@@ -13,11 +13,10 @@ class InviteModel(ULIDModel, TSModel):
     invitee_email = Column(String(100), nullable=True, index=True)
     invitee_user_id = Column(BigInteger, default=0, nullable=True, index=True, comment="邀请用户ID")
     token = Column(
-        String(64),
+        String(255),
         nullable=False,
         unique=True,
         index=True,
-        default=lambda: secrets.token_urlsafe(32),
         comment="邮件链接里携带",
     )
     state = Column(SmallInteger, nullable=False, default=InviteState.PENDING, comment="InviteState")

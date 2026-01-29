@@ -6,6 +6,7 @@ from pydantic.functional_serializers import PlainSerializer
 from slowapi.errors import RateLimitExceeded
 from msgspec import json as msgspec_json
 
+from app.core.app_code import AppCode
 from app.core.exception import (
     APIException,
     AuthException,
@@ -107,6 +108,10 @@ def register_exc_handler(app):
     @app.exception_handler(APIException)
     def server_exc_handler(request, exc: APIException):
         return make_json_response(exc.message or "Server Error!", code=exc.code, errmsg=exc.errmsg)
+
+    @app.exception_handler(404)
+    def notfound_exc_handler(request, exc):
+        return make_json_response("not found", code=404, errmsg="资源不见啦~")
 
     @app.exception_handler(RequestValidationError)
     async def req_validation_exc_handler(request, exc: RequestValidationError):

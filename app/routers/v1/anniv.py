@@ -40,3 +40,10 @@ async def get_my_anniv_list(
     ret = await AnnivService.get_anniv_feed(session, cur_user, params)
 
     return make_response(data=ret)
+
+
+@router.get("/{pk}", response_model=RespModel[AnnivFeedItem])
+async def get_anniv(session: SessionDep, cur_user: RequireAuthDep, pk: str):
+    ret = await AnnivService.get_anniv(session, cur_user, pk)
+
+    return make_response(data=ret)

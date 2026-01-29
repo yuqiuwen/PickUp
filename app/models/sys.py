@@ -2,34 +2,6 @@ from app.constant import MediaState, MediaType, SettingsGroup, SettingsSwitch
 from app.models.module import *
 
 
-_DEFAULT_SETTINGS = [
-    {
-        "group": SettingsGroup.NOTIFICATION,
-        "name": "ntfy_anniv_invite",
-        "label": "纪念日邀请",
-        "value": SettingsSwitch.ON.value,
-    },
-    {
-        "group": SettingsGroup.NOTIFICATION,
-        "name": "ntfy_anniv_remind",
-        "label": "纪念日提醒",
-        "value": SettingsSwitch.ON.value,
-    },
-    {
-        "group": SettingsGroup.NOTIFICATION,
-        "name": "ntfy_comment",
-        "label": "评论",
-        "value": SettingsSwitch.ON.value,
-    },
-    {
-        "group": SettingsGroup.PRIVACY,
-        "name": "privacy_unaccept_anniv_invite",
-        "label": "不接受纪念日邀请",
-        "value": SettingsSwitch.OFF.value,
-    },
-]
-
-
 class SettingsModel(BaseModel, TSModel, BigOperatorModel, StateModel):
     """系统设置"""
 

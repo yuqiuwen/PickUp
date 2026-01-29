@@ -1,11 +1,12 @@
 from operator import imod
-from sqlalchemy import Select, select
+from sqlalchemy import Select, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, noload
 
 from app.models._mixin import BaseMixin
 from app.models.sys import SettingsModel
 from app.models.user import ShareGroupMemberModel, ShareGroupModel, User, UserSettings
+from app.schemas.user import SimpleUser
 from app.utils.paginator import Paginator
 
 
@@ -40,19 +41,31 @@ class ShareGroupRepo(BaseMixin[ShareGroupModel]):
         session: AsyncSession,
         group_id: list[str] | str = None,
         owner_id: list[int] | int = None,
+        name: str = None,
+        kw: str = None,
         only_cols: list = None,
     ) -> list[ShareGroupModel]:
+        where = [self.model.is_public == 1]
+
         if group_id:
             if isinstance(group_id, str):
-                where = [self.model.id == group_id]
+                where.append(self.model.id == group_id)
             else:
-                where = [self.model.id.in_(group_id)]
+                where.append(self.model.id.in_(group_id))
+        if name:
+            where.append(self.model.name.ilike(f"%{name}%"))
 
         if owner_id:
             if isinstance(owner_id, int):
-                where = [self.model.id == owner_id]
+                where.append(self.model.id == owner_id)
             else:
-                where = [self.model.owner_id.in_(owner_id)]
+                where.append(self.model.owner_id.in_(owner_id))
+
+        if kw:
+            if kw.isdigit():
+                where.append(or_(self.model.name.ilike(f"%{kw}%"), self.model.id == kw))
+            else:
+                where.append(self.model.name.ilike(f"%{kw}%"))
 
         stmt = select(self.model).where(*where)
         if only_cols:
@@ -121,6 +134,8 @@ class UserSettingsRepo(BaseMixin[UserSettings]):
 
 
 class UserRepo(BaseMixin[User]):
+    BASE_USER_COLS = [getattr(User, c) for c in SimpleUser.model_fields.keys()]
+
     async def add(self, session, commit=True, **data):
         user = await self.create(session, data, commit=commit)
         return user
@@ -143,12 +158,27 @@ class UserRepo(BaseMixin[User]):
             cond.append(self.model.id == user_ids)
         else:
             cond.append(self.model.id.in_(user_ids))
-        stmt = self.filter(session, *cond)
+        stmt = self.filter(*cond)
         if only_cols:
             stmt = stmt.options(load_only(*only_cols))
 
         ret = await session.execute(stmt)
-        return ret.all()
+        return ret.scalars().all()
+
+    async def list(self, session, kw: str = None, only_cols=None):
+        where = []
+        if kw:
+            if kw.isdigit():
+                where.append(or_(self.model.username.ilike(f"%{kw}%"), self.model.id == int(kw)))
+            else:
+                where.append(self.model.username.ilike(f"%{kw}%"))
+
+        stmt = select(self.model).where(*where)
+        if only_cols:
+            stmt = stmt.options(load_only(*only_cols))
+
+        ret = await session.execute(stmt)
+        return ret.scalars().all()
 
     async def retrieve_or_404(self, session, pk):
         return await self.first_or_404(session, self.model.id == pk)

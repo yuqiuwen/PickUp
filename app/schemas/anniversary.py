@@ -7,7 +7,14 @@ from sqlalchemy.sql.expression import true
 from app.constant import AnniversaryType, CalendarType, ReminderChannel, RepeatType
 from app.core.exception import ValidateError
 from app.schemas.field import AutoFormatTimeField, TimestampField
-from app.schemas.common import CursorPageQueryModel, EntityModel, OrderByModel, UpdateMediaSchema
+from app.schemas.common import (
+    CursorPageQueryModel,
+    EntityModel,
+    MediaSchema,
+    OrderByModel,
+    TagsSchema,
+    UpdateMediaSchema,
+)
 from app.schemas.user import ShareGroupMemberSchema, ShareGroupShema, SimpleUser, UserSchema
 from app.utils.common import parse_sort_str
 from app.utils.dater import DT
@@ -68,6 +75,7 @@ class CreateAnnivSchema(BaseModel):
     lunar_day: int | None = Field(default=None)
     lunar_is_leap: bool = Field(default=False)
     tz: str | None = Field(default="Asia/Shanghai")
+    location: str | None = Field(default=None, max_length=50)
 
     next_trigger_at: int | None = Field(default=None)
 
@@ -81,7 +89,8 @@ class CreateAnnivSchema(BaseModel):
     def validate_data(self) -> "CreateAnnivSchema":
         from app.utils.remind_calculator import RemindConfigCalculator
 
-        calculator = RemindConfigCalculator(ZoneInfo(self.tz))
+        tz = ZoneInfo(self.tz)
+        calculator = RemindConfigCalculator(tz)
 
         if self.calendar_type == CalendarType.LUNAR:
             _calc_event_date = date(self.lunar_year, self.lunar_month, self.lunar_day)
@@ -102,13 +111,16 @@ class CreateAnnivSchema(BaseModel):
         )
 
         # 日程的下一次发生时间
-        next_trigger = calculator.calculate_next_trigger(
-            RemindConfig(offset_days=0, trigger_time=_trigger_time),
-            _calc_event_date,
-            self.repeat_type,
-            self.calendar_type,
-            self.lunar_is_leap,
-        )
+        if self.repeat_type == RepeatType.NONE:
+            next_trigger = datetime.combine(self.event_date, _trigger_time).replace(tzinfo=tz)
+        else:
+            next_trigger = calculator.calculate_next_trigger(
+                RemindConfig(offset_days=0, trigger_time=_trigger_time),
+                _calc_event_date,
+                self.repeat_type,
+                self.calendar_type,
+                self.lunar_is_leap,
+            )
         self.next_trigger_at = next_trigger
 
         if self.remind_rule and self.remind_rule.slots:
@@ -153,15 +165,16 @@ class AnnivSchema(EntityModel):
     lunar_is_leap: bool
     next_trigger_at: datetime
     tz: str
+    location: str | None = None
 
-    members: list[AnnivMemberSchema]
-    owner: UserSchema
+    members: AnnivMemberSchema | None = None
+    owner: SimpleUser
 
 
 class AnnivStat(BaseModel):
     year_total: int = Field(default=0)
     share_total: int = Field(default=0)
-    next_anniv: AnnivSchema | None = Field(default=None)
+    next_anniv: List[AnnivSchema] = Field(default_factory=list)
 
 
 class QueryAnnivSchema(BaseModel):
@@ -208,15 +221,20 @@ class AnnivFeedItem(EntityModel):
     share_mode: int
     type: AnniversaryType
     is_reminder: bool
+    repeat_type: RepeatType
     tz: str
     lunar_year: int | None = Field(default=None)
     lunar_month: int | None = Field(default=None)
     lunar_day: int | None = Field(default=None)
     lunar_is_leap: bool
     next_trigger_at: datetime
+    location: str | None = None
     ctime: int
     utime: int
 
-    owner: UserSchema
+    tags: List[TagsSchema] = Field(default_factory=list)
+    medias: List[MediaSchema] = Field(default_factory=list)
+    owner: SimpleUser | None = None
+    user: UserSchema | None = None
     stats: AnnivStats = Field(default_factory=AnnivStats)
     interaction: Interaction = Field(default_factory=Interaction)

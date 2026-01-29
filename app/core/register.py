@@ -13,6 +13,7 @@ from app.core.exception import APIException, AuthException, DecryptedError, Vali
 from app.core.http_handler import make_response, register_exc_handler
 from app.core.loggers import app_logger
 from app.core.middleware import register_middleware
+from app.database.db import init_async_engine_and_session
 from app.ext import crypt
 from app.database import redis_client
 from app.middlewares.jwt_auth import JwtAuthMiddleware
@@ -27,7 +28,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     :param app: FastAPI 应用实例
     :return:
     """
-
+    init_async_engine_and_session(settings.DB_MAIN_URL)
     await redis_client.init(enable_redis_socket=settings.ENABLE_SOCKET)
 
     yield

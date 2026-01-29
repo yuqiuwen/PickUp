@@ -78,7 +78,7 @@ class EntityModel(BaseModel):
         )
 
     @classmethod
-    def to_dantic_model(
+    def to_dantic_model_list(
         cls,
         instances,
         strict: bool | None = None,
@@ -88,6 +88,19 @@ class EntityModel(BaseModel):
         """使用 pydantic 原生方法转换为字典列表"""
         return TypeAdapter(list[cls]).validate_python(
             instances, from_attributes=from_attributes, strict=strict, context=context
+        )
+
+    @classmethod
+    def to_dantic_model(
+        cls,
+        instance,
+        strict: bool | None = None,
+        from_attributes: bool | None = True,
+        context: dict[str, any] | None = None,
+    ):
+        """使用 pydantic 原生方法转换为字典列表"""
+        return TypeAdapter(cls).validate_python(
+            instance, from_attributes=from_attributes, strict=strict, context=context
         )
 
 
@@ -117,3 +130,9 @@ class UpdateMediaSchema(BaseModel):
 class TagsSchema(EntityModel):
     id: str
     name: str
+
+
+class MediaSchema(EntityModel):
+    id: str | None = Field(default=None)
+    type: MediaType
+    path: str

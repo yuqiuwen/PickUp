@@ -8,7 +8,6 @@ class CommentModel(BaseBigModel):
     __tablename__ = "comment"
     __table_args__ = (Index("ix_comment_rtype_rid_ctime", "rtype", "rid", "ctime"),)
 
-    id = Column(BigInteger, primary_key=True)
     parent_id = Column(BigInteger, nullable=False, default=-1, index=True, comment="父评论id")
     root_id = Column(BigInteger, nullable=False, default=-1, comment="根评论id")
     rtype = Column(SmallInteger, nullable=False, comment="评论的资源类型")
