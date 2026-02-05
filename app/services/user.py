@@ -1,7 +1,9 @@
 import string
 import random
-from typing import Literal
+from typing import List, Literal
 
+from fastapi import HTTPException
+from sqlalchemy import Integer, cast, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from ulid import ULID
 
@@ -14,10 +16,12 @@ from app.schemas.user import (
     GroupMemberOptions,
     ShareGroupMemberSchema,
     ShareGroupShema,
+    UpdateSettingSchema,
     UpdateUserSchema,
     UserSchema,
 )
 from app.services.cache.user import UserStatCache
+from app.utils.dater import DT
 
 
 class UserService:
@@ -69,40 +73,6 @@ class UserService:
     async def update_me(session, user, data: UpdateUserSchema):
         user_obj = await user_repo.edit(session, user.id, data.model_dump(exclude_unset=True))
         return user_obj
-
-    @staticmethod
-    async def get_me_settings(
-        session, user: TokenUserInfo, setting_name: str = None
-    ) -> dict[str, str]:
-        """获取我的设置
-
-        Returns:
-            dict[str, str]: dict[name, value]
-        """
-        items = await user_settings_repo.retrieve(session, user.id, setting_name=setting_name)
-
-        ret = {}
-        for settings, user_settings in items:
-            default_value = settings.value
-            user_value = getattr(user_settings, "value", None)
-            value = user_value if user_value is not None else default_value
-            ret[settings.name] = value
-
-        return ret
-
-    @staticmethod
-    async def get_me_one_setting(session, user_id: int, setting_name: str) -> str:
-        """获取我的某个设置
-
-        Returns:
-            str:
-        """
-        default_value, user_value = await user_settings_repo.retrieve_one(
-            session, user_id, setting_name
-        )
-        value = user_value if user_value is not None else default_value
-
-        return value
 
     @staticmethod
     async def get_group_owner_mapping(session, group_id: list[str] | str = None) -> dict[str, int]:
@@ -190,5 +160,82 @@ class UserService:
     @staticmethod
     async def get_stats(session, uid: int):
         ret = await UserStatCache(uid).get(session)
+
+        return ret
+
+
+class SettingsService:
+    @staticmethod
+    async def get_me_settings(
+        session, user: TokenUserInfo, setting_name: str = None
+    ) -> dict[str, str]:
+        """获取我的设置
+
+        Returns:
+            dict[str, str]: dict[name, value]
+        """
+        items = await user_settings_repo.retrieve(session, user.id, setting_name=setting_name)
+
+        ret = {}
+        for settings, user_settings in items:
+            default_value = settings.value
+            user_value = getattr(user_settings, "value", None)
+            value = user_value if user_value is not None else default_value
+            ret[settings.name] = value
+
+        return ret
+
+    @staticmethod
+    async def get_me_one_setting(session, user_id: int, setting_name: str) -> str:
+        """获取我的某个设置
+
+        Returns:
+            str:
+        """
+        default_value, user_value = await user_settings_repo.retrieve_one(
+            session, user_id, setting_name
+        )
+        value = user_value if user_value is not None else default_value
+
+        return value
+
+    @staticmethod
+    async def batch_update_setting(session, user: TokenUserInfo, data: List[UpdateSettingSchema]):
+        settings = await user_settings_repo.list_setting(
+            session, setting_names=[n.name for n in data]
+        )
+        setting_name_id_map = {s.name: s.id for s in settings}
+
+        ret = await user_settings_repo.edit(
+            session,
+            user.id,
+            [
+                {
+                    "settings_id": setting_name_id_map[s.name],
+                    "user_id": user.id,
+                    "value": s.value,
+                    "utime": cast(func.extract("epoch", func.now()), Integer),
+                }
+                for s in data
+                if s.name in setting_name_id_map
+            ],
+        )
+
+        return ret
+
+    @staticmethod
+    async def update_setting(session, user: TokenUserInfo, data: UpdateSettingSchema):
+        setting = await user_settings_repo.retrieve_setting(session, setting_name=data.name)
+        ret = await user_settings_repo.edit(
+            session,
+            [
+                {
+                    "settings_id": setting.id,
+                    "user_id": user.id,
+                    "value": data.value,
+                    "utime": cast(func.extract("epoch", func.now()), Integer),
+                }
+            ],
+        )
 
         return ret

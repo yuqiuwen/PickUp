@@ -1,4 +1,4 @@
-from typing import Generic, List, Dict, Union, Literal, Sequence, Mapping
+from typing import Any, Generic, List, Dict, Union, Literal, Sequence, Mapping
 import time
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -190,7 +190,7 @@ class BaseMixin(Generic[Model]):
         index_elements: list = None,
         index_where: tuple = None,
         where=None,
-        _set=None,
+        _set: Mapping[str, Any] = None,
         returning: Union[tuple, list] = None,
         commit=True,
     ):
@@ -201,6 +201,7 @@ class BaseMixin(Generic[Model]):
         :param index_elements: 唯一约束, `constraint` 和 `index_elements`只能传递其中一个参数
         :param index_where: 更细粒度控制唯一约束，当满足唯一约束和index_where条件的才会触发更新
         :param where: 基于表级数据的过滤
+        :param _set: 存在时更新的字段值
         :param returning: 返回值
         :param commit:
         :return: 若有returning且插入单个记录，返回对应属性；否则返回rowcount

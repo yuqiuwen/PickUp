@@ -1,6 +1,6 @@
 import re
 from datetime import date
-from typing import List, Literal, Tuple, Annotated
+from typing import Any, List, Literal, Tuple, Annotated
 from typing_extensions import Self
 
 from pydantic import (
@@ -264,3 +264,8 @@ class UserStats(BaseModel):
     like_cnt: int = 0
     collect_cnt: int = 0
     comment_cnt: int = 0
+
+
+class UpdateSettingSchema(BaseModel):
+    name: str
+    value: str

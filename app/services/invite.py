@@ -22,7 +22,7 @@ from app.schemas.anniversary import AnnivSchema, CreateAnnivSchema, InviteFieldS
 from app.repo.invite import invite_repo
 from app.schemas.invite import InviteItem
 from app.services.email import email_service
-from app.services.user import UserService
+from app.services.user import SettingsService, UserService
 from app.utils.common import gen_urlsafe_token, hash_token
 from app.utils.dater import DT
 
@@ -98,7 +98,7 @@ class InviteService:
 
                 # 查询用户偏好设置：是否接受纪念日邀请
                 if self.ttype == InviteTargetType.ANNIVERSARY:
-                    unaccept_invite = UserService.get_me_one_setting(
+                    unaccept_invite = SettingsService.get_me_one_setting(
                         session, user_id, SettingEnum.PRIVACY_UNACCEPT_ANNIV_INVITE.value
                     )
                     if unaccept_invite == SettingsSwitch.ON:

@@ -1,5 +1,6 @@
 from operator import imod
 from typing import List
+from fastapi import HTTPException
 from sqlalchemy import Select, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, noload
@@ -115,11 +116,16 @@ class ShareGroupRepo(BaseMixin[ShareGroupModel]):
 
 
 class UserSettingsRepo(BaseMixin[UserSettings]):
-    async def edit(self, session: AsyncSession, user_id: int, data: list[dict], commit=True):
-        for item in data:
-            item.update(user_id=user_id)
-        user = await self.insert_do_update(session, data, commit=commit)
-        return user
+    async def edit(self, session: AsyncSession, data: List[dict], commit=True):
+        if not data:
+            raise HTTPException(status_code=404)
+        ret = await self.insert_do_update(
+            session,
+            data,
+            index_elements=[self.model.settings_id, self.model.user_id],
+            commit=commit,
+        )
+        return ret
 
     async def retrieve(
         self, session: AsyncSession, user_id: int, setting_name: str = None
@@ -161,6 +167,32 @@ class UserSettingsRepo(BaseMixin[UserSettings]):
         )
         items = (await session.execute(stmt)).one()
         return items
+
+    async def retrieve_setting(self, session, setting_name: str = None, setting_id: int = None):
+        cond = [SettingsModel.state == 1]
+        if setting_name:
+            cond.append(SettingsModel.name == setting_name)
+        if setting_id:
+            cond.append(SettingsModel.id == setting_id)
+
+        stmt = select(SettingsModel).where(*cond)
+        query = await session.execute(stmt)
+
+        return query.scalar_one_or_none()
+
+    async def list_setting(
+        self, session, setting_names: List[str] = None, setting_ids: List[int] = None
+    ):
+        cond = [SettingsModel.state == 1]
+        if setting_names:
+            cond.append(SettingsModel.name.in_(setting_names))
+        if setting_ids:
+            cond.append(SettingsModel.id.in_(setting_ids))
+
+        stmt = select(SettingsModel).where(*cond)
+        query = await session.execute(stmt)
+
+        return query.scalars().all()
 
 
 class UserRepo(BaseMixin[User]):

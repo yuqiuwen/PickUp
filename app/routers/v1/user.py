@@ -1,10 +1,11 @@
 import asyncio
+from typing import List
 from app.core.dependencies import RequireAuthDep, SessionDep
 from app.core.http_handler import RespModel, make_response
 from app.models.user import UserSettings
 from app.routers import BaseAPIRouter
-from app.schemas.user import UpdateUserSchema, UserSchema, UserStats
-from app.services.user import UserService
+from app.schemas.user import UpdateSettingSchema, UpdateUserSchema, UserSchema, UserStats
+from app.services.user import SettingsService, UserService
 
 
 router = BaseAPIRouter(prefix="/me", tags=["me"])
@@ -24,8 +25,19 @@ async def update_data(session: SessionDep, cur_user: RequireAuthDep, data: Updat
 
 @router.get("/settings", summary="获取我的设置", response_model=RespModel[dict[str, str]])
 async def get_settings(session: SessionDep, cur_user: RequireAuthDep):
-    data = await UserService.get_me_settings(session, cur_user)
+    data = await SettingsService.get_me_settings(session, cur_user)
     return make_response(data=data)
+
+
+@router.post("/settings", summary="更新设置")
+async def update_settings(
+    session: SessionDep, cur_user: RequireAuthDep, data: List[UpdateSettingSchema]
+):
+    if len(data) == 1:
+        ret = await SettingsService.update_setting(session, cur_user, data[0])
+    else:
+        ret = await SettingsService.batch_update_setting(session, cur_user, data)
+    return make_response(data=ret)
 
 
 @router.get("/stats", summary="获取我的统计", response_model=RespModel[UserStats])
