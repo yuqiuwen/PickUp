@@ -20,6 +20,7 @@ router = BaseAPIRouter(prefix="/invite", tags=["invite"])
 async def handle_invite_from_email(
     session: SessionDep, token: str, action: Literal["accept", "decline"]
 ):
+    # deprecated
     try:
         result = await InviteService.handle_invite(
             session=session,
@@ -37,14 +38,10 @@ async def handle_invite_from_email(
     except PermissionDenied:
         return HTMLResponse("<h3>该邀请已处理，无需重复操作</h3>", status_code=200)
 
-    # 方式1：直接返回一个简单 HTML 提示
     if result.state == InviteState.ACCEPTED:
         return HTMLResponse("<h3>你已成功接受邀请</h3>")
     else:
         return HTMLResponse("<h3>你已拒绝该邀请</h3>")
-
-    # 方式2：也可以重定向到前端某个页面（如 App H5）
-    # return RedirectResponse(f"https://your-frontend.com/anniversaries/invites/result?status={result.status}")
 
 
 @router.post("/accept", response_model=RespModel[Any])

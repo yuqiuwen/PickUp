@@ -224,3 +224,11 @@ class CommentState(IntEnumPro):
 class UserInterActionEnum(IntEnumPro):
     LIKE = 1, "点赞"
     COLLECT = 2, "收藏"
+    COMMENT = 3, "评论"
+    FOLLOW = 4, "关注"
+
+
+class FollowState(IntEnumPro):
+    UNFOLLOWED = 0, "取消关注"
+    FOLLOWING = 1, "关注"
+    MUTUAL = 2, "相互关注"

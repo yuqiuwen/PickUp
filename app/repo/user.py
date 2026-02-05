@@ -1,4 +1,5 @@
 from operator import imod
+from typing import List
 from sqlalchemy import Select, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, noload
@@ -6,7 +7,7 @@ from sqlalchemy.orm import load_only, noload
 from app.models._mixin import BaseMixin
 from app.models.sys import SettingsModel
 from app.models.user import ShareGroupMemberModel, ShareGroupModel, User, UserSettings
-from app.schemas.user import SimpleUser
+from app.schemas.user import CreateGroupSchema, SimpleUser
 from app.utils.paginator import Paginator
 
 
@@ -43,9 +44,11 @@ class ShareGroupRepo(BaseMixin[ShareGroupModel]):
         owner_id: list[int] | int = None,
         name: str = None,
         kw: str = None,
+        cur_user_id: int = None,
         only_cols: list = None,
+        load_members=True,
     ) -> list[ShareGroupModel]:
-        where = [self.model.is_public == 1]
+        where = []
 
         if group_id:
             if isinstance(group_id, str):
@@ -57,9 +60,17 @@ class ShareGroupRepo(BaseMixin[ShareGroupModel]):
 
         if owner_id:
             if isinstance(owner_id, int):
-                where.append(self.model.id == owner_id)
+                where.append(self.model.owner_id == owner_id)
             else:
                 where.append(self.model.owner_id.in_(owner_id))
+
+        if cur_user_id:
+            where.append(
+                or_(
+                    self.model.is_public == 1,
+                    (self.model.is_public == 0) & (self.model.members.any(user_id=cur_user_id)),
+                )
+            )
 
         if kw:
             if kw.isdigit():
@@ -67,13 +78,27 @@ class ShareGroupRepo(BaseMixin[ShareGroupModel]):
             else:
                 where.append(self.model.name.ilike(f"%{kw}%"))
 
-        stmt = select(self.model).where(*where)
+        stmt = select(self.model).where(*where).order_by(self.model.id.desc())
         if only_cols:
             stmt = stmt.options(load_only(*only_cols))
+        if not load_members:
+            stmt = stmt.options(noload(self.model.members))
 
         ret = await session.execute(stmt)
 
-        return ret.scalars().all()
+        return ret.unique().scalars().all()
+
+    async def add(
+        self, session: AsyncSession, group_data: dict, member_data: List[dict], commit=True
+    ):
+        group = await self.create(session, group_data, commit=False)
+
+        if member_data:
+            await session.run_sync(
+                lambda s: s.bulk_insert_mappings(ShareGroupMemberModel, member_data)
+            )
+        commit and await session.commit()
+        return group
 
     async def list_me_joined_group_ids(self, session: AsyncSession, user_id: int):
         stmt = select(ShareGroupMemberModel.group_id).where(
@@ -81,6 +106,11 @@ class ShareGroupRepo(BaseMixin[ShareGroupModel]):
         )
         ret = await session.execute(stmt)
 
+        return ret.scalars().all()
+
+    async def list_members_of_group(self, session: AsyncSession, group_id: str):
+        stmt = select(ShareGroupMemberModel).where(group_id=group_id)
+        ret = await session.execute(stmt)
         return ret.scalars().all()
 
 

@@ -7,7 +7,7 @@ from app.core.http_handler import RespModel, make_response
 from app.ext.limiter import limiter
 from app.routers import BaseAPIRouter
 from app.schemas.common import EmailSchema
-from app.schemas.user import GroupMemberOptions, ShareGroupShema, SimpleUser
+from app.schemas.user import CreateGroupSchema, GroupMemberOptions, ShareGroupShema, SimpleUser
 from app.services.email import email_service
 from app.services.user import UserService
 
@@ -28,8 +28,8 @@ async def send_email_code(request: Request, data: EmailSchema):
 
 
 @router.get("/groups", summary="获取组列表", response_model=RespModel[List[ShareGroupShema]])
-async def get_groups(session: SessionDep, cur_user: RequireAuthDep, search: str):
-    data = await UserService.get_group_list(session, search)
+async def get_groups(session: SessionDep, cur_user: RequireAuthDep, search: str = None):
+    data = await UserService.get_group_list(session, cur_user.id, search)
     return make_response(data=data)
 
 
@@ -43,5 +43,17 @@ async def get_members(session: SessionDep, cur_user: RequireAuthDep, search: str
     "/groups_members", summary="获取用户和组列表", response_model=RespModel[GroupMemberOptions]
 )
 async def get_group_and_members(session: SessionDep, cur_user: RequireAuthDep, search: str):
-    data = await UserService().get_group_member_list(session, search)
+    data = await UserService().get_group_member_list(session, cur_user, search)
     return make_response(data=data)
+
+
+@router.get("/group/{id}", summary="获取组详情", response_model=RespModel[ShareGroupShema])
+async def get_group_detail(session: SessionDep, cur_user: RequireAuthDep, id: str):
+    ret = await UserService().get_group_detail(session, id)
+    return make_response(data=ret)
+
+
+@router.post("/group", summary="创建组")
+async def craate_group(session: SessionDep, cur_user: RequireAuthDep, data: CreateGroupSchema):
+    await UserService().create_group(session, cur_user, data)
+    return make_response()

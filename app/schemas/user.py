@@ -7,6 +7,7 @@ from pydantic import (
     BaseModel,
     Field,
     ValidationInfo,
+    computed_field,
     model_validator,
     ConfigDict,
     field_validator,
@@ -33,9 +34,9 @@ def validate_user_pwd(pwd: str) -> Tuple[bool, str]:
     return True, ""
 
 
-def validate_account(account: str) -> bool:
-    if len(account) > 12 or len(account) < 6:
-        raise ValidateError(errmsg="账号长度必须在6-12个字符")
+def validate_account(account: str, min=4, max=12) -> bool:
+    if len(account) > max or len(account) < min:
+        raise ValidateError(errmsg=f"账号长度必须在{min}-{max}个字符")
     if not re.match(r"^[_a-zA-Z0-9-]+$", account):
         raise ValidateError(errmsg="账号只能包含英文、数字、下划线、短横线")
     return True
@@ -58,7 +59,7 @@ class SignSchema(BaseModel):
 
     auth_type: AuthType
     account: str = Field(
-        description="账号/手机号/邮箱/微信，其中账号只能包含英文、数字、下划线、短横线，长度必须在6-12个字符"
+        description="账号/手机号/邮箱/微信，其中账号只能包含英文、数字、下划线、短横线，长度必须在4-12个字符"
     )
     pwd: str = Field(default=None, description="密码（加密后）")
     code: str = Field(default=None, description="验证码")
@@ -208,10 +209,10 @@ class UpdateUserSchema(BaseModel):
 
 
 class ShareGroupMemberSchema(EntityModel):
-    id: str
-    group_id: int
+    group_id: str
+    user_id: int
     role: int
-    user: UserSchema | None
+    user: SimpleUser | None = None
 
 
 class ShareGroupShema(EntityModel):
@@ -223,7 +224,13 @@ class ShareGroupShema(EntityModel):
     max_members: int
     is_public: int
 
-    members: list[ShareGroupMemberSchema] = Field(default_factory=list)
+    members: list[ShareGroupMemberSchema] | None = Field(default_factory=list)
+
+    @computed_field
+    @property
+    def member_count(self) -> int:
+        """计算成员数量"""
+        return len(self.members)
 
 
 class UserSettingsItem(BaseModel):
@@ -239,3 +246,21 @@ class UserSettingsItem(BaseModel):
 class GroupMemberOptions(EntityModel):
     groups: List[ShareGroupShema] | None = Field(default_factory=list)
     members: List[SimpleUser] | None = Field(default_factory=list)
+
+
+class CreateGroupSchema(BaseModel):
+    name: str = Field(min=1, max=20)
+    description: str | None = None
+    cover: str | None = None
+    is_public: int = Field(default=0, description="是否公开")
+    owner_id: int | None = None
+
+    members: List[int] | None = Field(default_factory=list)
+
+
+class UserStats(BaseModel):
+    follow_cnt: int = 0
+    fan_cnt: int = 0
+    like_cnt: int = 0
+    collect_cnt: int = 0
+    comment_cnt: int = 0

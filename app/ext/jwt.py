@@ -155,12 +155,12 @@ class JWTManager:
                 flg=flg,
             )
 
-        except JWTError:
-            raise AuthException("Invalid token", errmsg="token无效")
         except ExpiredSignatureError:
             raise AuthException("Token expired", code=AppCode.AUTH_INVALID, errmsg="登录状态已过期")
+        except JWTError:
+            raise AuthException("Invalid token", errmsg="认证失败")
         except Exception:
-            raise AuthException("Invalid token", errmsg="token无效")
+            raise AuthException("Invalid token", errmsg="认证失败")
 
     async def load_from_cache(
         self, user_id: int, jti: str, flg: Literal["access", "refresh"]

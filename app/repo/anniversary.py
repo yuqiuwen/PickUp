@@ -222,6 +222,19 @@ class AnnivRepo(BaseMixin[AnniversaryModel]):
         result = await session.execute(stmt)
         return result.scalars().all()
 
+    async def get_share_cnt(self, session, cur_user_id: int):
+        member_or_group_exists = await self.get_share_stmt(session, cur_user_id)
+        stmt = select(func.count(self.model.id)).where(
+            self.model.state == 1,
+            self.model.share_mode == 1,
+            or_(
+                self.model.owner_id == cur_user_id,
+                and_(self.model.share_mode == 1, member_or_group_exists),
+            ),
+        )
+        ret = await session.execute(stmt)
+        return ret.scalar() or 0
+
     async def add_tag(
         self, session, anniv_id: str, create_by: int, tags: List[CreateTagSchema], commit=True
     ):
@@ -386,7 +399,7 @@ class RemindRepo(BaseMixin[ReminderRule]):
         data: RemindRuleSchema,
         commit=True,
     ):
-        result = session.execute(self.filter(self.model.anniv_id == anniv_id)).scalars()
+        result = await session.execute(self.filter(self.model.anniv_id == anniv_id))
         for rule in result.scalars():
             await session.delete(rule)
 

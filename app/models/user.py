@@ -75,6 +75,14 @@ class ShareGroupModel(ULIDModel, TSModel, BigOperatorModel):
     max_members = Column(Integer, nullable=False, default=100, comment="最大成员数")
     is_public = Column(SmallInteger, nullable=False, default=1, comment="0私密 1公开")
 
+    members = relationship(
+        "ShareGroupMemberModel",
+        viewonly=True,
+        uselist=True,
+        lazy="selectin",
+        primaryjoin="ShareGroupModel.id == foreign(ShareGroupMemberModel.group_id)",
+    )
+
 
 class ShareGroupMemberModel(TSModel):
     """共享组成员"""

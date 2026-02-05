@@ -3,11 +3,21 @@ import random
 from typing import Literal
 
 from sqlalchemy.ext.asyncio import AsyncSession
+from ulid import ULID
 
+from app.constant import GroupRole
 from app.ext.jwt import TokenUserInfo
 from app.models.user import ShareGroupModel, User
 from app.repo.user import UserRepo, share_group_repo, user_repo, user_settings_repo
-from app.schemas.user import GroupMemberOptions, UpdateUserSchema, UserSchema
+from app.schemas.user import (
+    CreateGroupSchema,
+    GroupMemberOptions,
+    ShareGroupMemberSchema,
+    ShareGroupShema,
+    UpdateUserSchema,
+    UserSchema,
+)
+from app.services.cache.user import UserStatCache
 
 
 class UserService:
@@ -109,8 +119,8 @@ class UserService:
         return ret
 
     @staticmethod
-    async def get_group_list(session, search: str):
-        items = await share_group_repo.list(session, kw=search)
+    async def get_group_list(session, uid: int, search: str):
+        items = await share_group_repo.list(session, cur_user_id=uid, kw=search)
         return items
 
     @staticmethod
@@ -118,7 +128,67 @@ class UserService:
         items = await user_repo.list(session, kw=search, only_cols=UserRepo.BASE_USER_COLS)
         return items
 
-    async def get_group_member_list(self, session, search: str):
-        groups = await self.get_group_list(session, search)
+    async def get_group_member_list(self, session, cur_user: TokenUserInfo, search: str):
+        groups = await self.get_group_list(session, cur_user.id, search)
         members = await self.get_member_list(session, search)
         return GroupMemberOptions(groups=groups, members=members)
+
+    async def create_group(self, session, user: TokenUserInfo, data: CreateGroupSchema):
+        # 暂定为100个限制
+        max_members_cnt = 100
+        group_id = str(ULID())
+
+        if not data.owner_id:
+            data.owner_id = user.id
+        if not data.members:
+            data.members = {data.owner_id, user.id}
+        else:
+            data.members = set(data.members) | {data.owner_id, user.id}
+
+        group_data = data.model_dump()
+        member_ids = group_data.pop("members")
+
+        group_data.update(
+            id=group_id, max_members=max_members_cnt, create_by=user.id, update_by=user.id
+        )
+        member_data = [
+            {
+                "user_id": uid,
+                "group_id": group_id,
+                "role": GroupRole.OWNER if uid == data.owner_id else GroupRole.MEMBER,
+            }
+            for uid in member_ids
+        ]
+        ret = await share_group_repo.add(session, group_data, member_data)
+
+        return ret
+
+    @staticmethod
+    async def get_group_detail(session, group_id: str) -> ShareGroupShema:
+        group = await share_group_repo.retrieve(session, group_id)
+        members = group.members
+        users = await user_repo.list_by_uid(
+            session, {m.user_id for m in members}, only_cols=user_repo.BASE_USER_COLS
+        )
+        users_mapping = {u.id: u for u in users}
+
+        group_item = ShareGroupShema.model_validate(group)
+
+        members_data = []
+        for m in members:
+            members_data.append(
+                ShareGroupMemberSchema(
+                    group_id=m.group_id,
+                    user_id=m.user_id,
+                    role=m.role,
+                    user=users_mapping.get(m.user_id),
+                )
+            )
+        group_item.members = members_data
+        return group_item
+
+    @staticmethod
+    async def get_stats(session, uid: int):
+        ret = await UserStatCache(uid).get(session)
+
+        return ret

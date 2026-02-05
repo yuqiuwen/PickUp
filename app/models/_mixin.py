@@ -190,6 +190,7 @@ class BaseMixin(Generic[Model]):
         index_elements: list = None,
         index_where: tuple = None,
         where=None,
+        _set=None,
         returning: Union[tuple, list] = None,
         commit=True,
     ):
@@ -207,10 +208,10 @@ class BaseMixin(Generic[Model]):
         try:
             if isinstance(data, Mapping):
                 stmt = insert(self.model).values(**data)
-                set_ = data
+                set_ = data if not _set else _set
             else:
                 stmt = insert(self.model).values(data)
-                set_ = {c: getattr(stmt.excluded, c) for c in data[0].keys()}
+                set_ = {c: getattr(stmt.excluded, c) for c in data[0].keys()} if not _set else _set
 
             do_update_stmt = stmt.on_conflict_do_update(
                 constraint=constraint,

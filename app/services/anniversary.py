@@ -105,12 +105,11 @@ class AnnivService:
 
     @staticmethod
     async def get_base_stat(session, cur_user: TokenUserInfo):
-        year_total = await anniv_repo.get_year_total(session, cur_user.id, DT.now_year())
-        next_annivs = await anniv_repo.get_next(
-            session,
-            cur_user.id,
-        )
-        return AnnivStat(year_total=year_total, next_anniv=next_annivs)
+        user_id = cur_user.id
+        year_total = await anniv_repo.get_year_total(session, user_id, DT.now_year())
+        next_annivs = await anniv_repo.get_next(session, user_id)
+        share_total = await anniv_repo.get_share_cnt(session, user_id)
+        return AnnivStat(year_total=year_total, share_total=share_total, next_anniv=next_annivs)
 
     @staticmethod
     async def get_anniv_feed(
