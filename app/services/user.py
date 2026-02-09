@@ -10,6 +10,8 @@ from ulid import ULID
 from app.constant import GroupRole
 from app.ext.jwt import TokenUserInfo
 from app.models.user import ShareGroupModel, User
+from app.repo.interaction import interaction_repo
+from app.repo.relationship import fan_repo, follow_repo
 from app.repo.user import UserRepo, share_group_repo, user_repo, user_settings_repo
 from app.schemas.user import (
     CreateGroupSchema,
@@ -19,6 +21,7 @@ from app.schemas.user import (
     UpdateSettingSchema,
     UpdateUserSchema,
     UserSchema,
+    UserStats,
 )
 from app.services.cache.user import UserStatCache
 from app.utils.dater import DT
@@ -159,7 +162,18 @@ class UserService:
 
     @staticmethod
     async def get_stats(session, uid: int):
-        ret = await UserStatCache(uid).get(session)
+        cache = UserStatCache(uid)
+        data = await cache.get(session)
+        if not data:
+            follow_cnt = await follow_repo.get_follow_cnt(session, uid)
+            fan_cnt = await fan_repo.get_fan_cnt(session, uid)
+            like_collect_cnt_mapping = await interaction_repo.get_like_collect_cnt(session, uid)
+
+            # TODO comment
+
+            data = {"follow_cnt": follow_cnt, "fan_cnt": fan_cnt, **like_collect_cnt_mapping}
+            await cache.add(data)
+            ret = UserStats(**data)
 
         return ret
 

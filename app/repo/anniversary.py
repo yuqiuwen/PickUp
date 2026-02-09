@@ -186,6 +186,11 @@ class AnnivRepo(BaseMixin[AnniversaryModel]):
 
         return CursorPaginatedResponse(last=0, has_more=False, items=query)
 
+    async def get_anniv_by_id(self, session, ids: List[int]):
+        stmt = select(self.model).where(self.model.state == 1, self.model.id.in_(ids))
+        query = await session.execute(stmt)
+        return query.scalars().all()
+
     async def get_year_total(self, session, cur_user_id: int, year: int):
         stmt = select(func.count(self.model.id)).where(
             self.model.state == 1,

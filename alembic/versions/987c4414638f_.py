@@ -237,7 +237,6 @@ def upgrade() -> None:
             "ttype", sa.SmallInteger(), nullable=False, comment="ResourceType目标对象资源类型"
         ),
         sa.Column("tid", sa.String(), nullable=False, comment="目标对象id"),
-        sa.Column("cursor", sa.BigInteger(), nullable=False, comment="最新读取的游标"),
         sa.Column("ttime", sa.Integer(), nullable=False, comment="事件触发时间"),
         sa.Column(
             "ctime",

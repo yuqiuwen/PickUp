@@ -215,6 +215,8 @@ class UserRepo(BaseMixin[User]):
         return await self.filter_one(session, *cond)
 
     async def list_by_uid(self, session, user_ids: list[int] | int, only_cols: list = None):
+        if not user_ids:
+            return []
         cond = []
         if isinstance(user_ids, int):
             cond.append(self.model.id == user_ids)
@@ -226,6 +228,13 @@ class UserRepo(BaseMixin[User]):
 
         ret = await session.execute(stmt)
         return ret.scalars().all()
+
+    async def get_user_mapping(
+        self, session, user_ids: list[int] | int, only_cols: list = None
+    ) -> dict[int, User]:
+        data: User = await self.list_by_uid(session, user_ids, only_cols=only_cols)
+        ret = {u.id: u for u in data}
+        return ret
 
     async def list(self, session, kw: str = None, only_cols=None):
         where = []

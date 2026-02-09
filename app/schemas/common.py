@@ -14,7 +14,7 @@ class PageQueryModel(BaseModel):
 
 
 class CursorPageQueryModel(BaseModel):
-    last: Any = Field(0)
+    last: str | int | None = Field(0)
     limit: int = Field(20, gt=0, le=200)
 
 

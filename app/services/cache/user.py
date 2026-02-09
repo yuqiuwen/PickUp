@@ -2,6 +2,7 @@ from typing import Literal, TypeAlias
 from app.config import settings
 from app.repo.interaction import interaction_repo
 from app.repo.relationship import fan_repo, follow_repo
+from app.schemas.notification import EmptyUnReadMsgCnt, UnReadMsgCntSchema
 from app.schemas.user import UserStats
 from . import BaseCache, CacheKey
 from app.database import pms_cache, redcache
@@ -13,6 +14,10 @@ UserStatsField: TypeAlias = Literal[
     "like_cnt",
     "collect_cnt",
     "comment_cnt",
+]
+
+UnReadMsgCntField: TypeAlias = Literal[
+    "sys_cnt", "fan_cnt", "like_cnt", "collect_cnt", "comment_cnt", "invite_cnt"
 ]
 
 
@@ -82,16 +87,6 @@ class UserStatCache(BaseCache):
         if ret:
             return UserStats(**ret)
 
-        follow_cnt = await follow_repo.get_follow_cnt(session, self.uid)
-        fan_cnt = await fan_repo.get_fan_cnt(session, self.uid)
-        like_collect_cnt_mapping = await interaction_repo.get_like_collect_cnt(session, self.uid)
-
-        # TODO comment
-
-        data = {"follow_cnt": follow_cnt, "fan_cnt": fan_cnt, **like_collect_cnt_mapping}
-        await self.add(data)
-
-        ret = UserStats(**data)
         return ret
 
     async def add(self, data: dict, expire=12 * 60 * 60):
@@ -126,3 +121,61 @@ class UserStatCache(BaseCache):
 
         cnt = await redcache.script.hincr_if_exists(keys=[self.key], args=[field, -cnt])
         return cnt
+
+
+class UnReadMsgCntCache(BaseCache):
+    __KEY__ = CacheKey.UNREAD_MSG_CNT.value
+
+    def __init__(self, uid: int):
+        self.key = self.__KEY__.format(uid)
+
+    async def add(self, data: dict, exp=24 * 60 * 60):
+        async with redcache.pipeline() as pipe:
+            pipe.hset(self.key, mapping=data).expire(self.key, exp)
+            ret = await pipe.execute()
+            return ret[0]
+
+    async def get(self):
+        ret = await redcache.hgetall(self.key)
+        if ret:
+            return UnReadMsgCntSchema(**ret)
+
+    async def delete(self):
+        return await redcache.delete(self.key)
+
+    @property
+    async def exists(self):
+        return await redcache.exists(self.key)
+
+    async def incr(self, field: UnReadMsgCntField):
+        """
+        计数 +1
+        :param field:
+        :return:
+        """
+        return await redcache.script.hincr_if_exists(keys=[self.key], args=[field, 1], amount=1)
+
+    async def decr(self, field: UnReadMsgCntField, amount=1):
+        """
+        计数 -1
+        :param field:
+        :param amount: 减少的数量
+        :return:
+        """
+        cnt = await redcache.script.hincr_if_exists(keys=[self.key], args=[field, -amount])
+        if cnt is None or cnt >= 0:
+            return cnt
+
+        cnt = await redcache.script.hincr_if_exists(keys=[self.key], args=[field, -cnt])
+        return cnt
+
+    async def reset_all(self):
+        """重置全部消息为：已读"""
+        if self.exists:
+            await self.add(EmptyUnReadMsgCnt)
+            return EmptyUnReadMsgCnt
+
+    async def reset_one(self, field: UnReadMsgCntField):
+        """重置某一类消息"""
+        if self.exists:
+            return await redcache.hset(self.key, field, 0)

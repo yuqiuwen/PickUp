@@ -9,7 +9,7 @@ T = TypeVar("T")
 
 
 class PaginatedResponse(BaseModel, Generic[T]):
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
 
     page: int
     limit: int
@@ -18,7 +18,7 @@ class PaginatedResponse(BaseModel, Generic[T]):
 
 
 class CursorPaginatedResponse(BaseModel, Generic[T]):
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
 
     last: Any
     has_more: bool = False
@@ -66,6 +66,7 @@ class ScrollPaginator(Paginator):
         sort_col_index=None,
         order_col="id",
         custom_last_field=None,
+        is_row=False,
     ):
         """
 
@@ -78,8 +79,12 @@ class ScrollPaginator(Paginator):
             如：row([Post, PostCommunity])，现要根据post的id排序，则其索引下标为0
             注意：如果排序字段可直接通过row对象访问，则不用传递此参数，比如，row([Post, PostCommunity.community_id])，
                 现要根据PostCommunity.community_id排序, 则无需传递此参数
-        :param order_col: 排序字段名
-        :param custom_last_field: 若指定custom_last_field，则last=model.custom_last_field；默认为model.order_col
+        :param order_col:
+            排序字段名
+        :param custom_last_field:
+            若指定custom_last_field，则last=model.custom_last_field；默认为model.order_col
+        :param is_row:
+            stmt是否返回为row对象
 
         """
         super().__init__(db_session)
@@ -91,6 +96,7 @@ class ScrollPaginator(Paginator):
         self.sort_col_index = sort_col_index
         self.order_col = order_col
         self.last_field = custom_last_field or order_col
+        self.is_row = is_row
 
     async def paginate(
         self,
@@ -123,7 +129,7 @@ class ScrollPaginator(Paginator):
         result = await self.db.execute(current_stmt.limit(limit + 1))
 
         # 根据是否多表查询选择不同的解析方式
-        if self.sort_col_index is not None:
+        if self.sort_col_index is not None or self.is_row:
             queryset = result.all()  # 多表join返回Row对象
         else:
             queryset = result.scalars().all()  # 单表返回模型对象

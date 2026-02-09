@@ -1,4 +1,5 @@
 from enum import IntEnum, Enum
+from types import MappingProxyType
 
 
 class EnumPro(Enum):
@@ -171,17 +172,24 @@ class MediaState(IntEnumPro):
     PASSED = 1, "审核通过"
 
 
-class ActionEnum(IntEnumPro):
-    """触发消息事件的行为"""
-
+class RemindActionEnum(IntEnumPro):
     LIKE = 1, "点赞"
     COLLECT = 2, "收藏"
     COMMENT = 3, "评论"
     REPLY = 4, "回复"
     MENTION = 5, "提及"
-    INVITE = 6, "邀请"
+    FAN = 6, "粉丝"
+    INVITE = 7, "邀请"
 
-    REFUSED_INVITE = -6, "拒绝邀请"
+    REFUSED_INVITE = -7, "拒绝邀请"
+
+
+class SysActionEnum(IntEnumPro):
+    SYS = 99, "系统"
+
+
+class SysAnnounceActionEnum(IntEnumPro):
+    ANNOUNCE = 98, "公告"
 
 
 class ResourceType(IntEnumPro):
