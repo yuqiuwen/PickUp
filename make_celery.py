@@ -33,7 +33,7 @@ def init_celery_app() -> Celery:
             Queue("email-job", Exchange("email-job"), routing_key="email-job"),
         ),
         task_default_queue="default",
-        include=["app.tasks._runtime", "app.tasks.anniv_task"],
+        include=["app.tasks._runtime", "app.tasks.anniv_task", "app.tasks.sync_task"],
     )
 
     celery.autodiscover_tasks(["app.tasks"])

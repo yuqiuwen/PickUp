@@ -3,7 +3,7 @@ import os
 
 log_dir = "/data/logs/pickup"
 bind = os.getenv("BIND", "0.0.0.0:5555")
-workers = min(multiprocessing.cpu_count() * 2, 4)
+workers = 2
 
 
 worker_class = "uvicorn.workers.UvicornWorker"

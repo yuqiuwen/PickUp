@@ -16,15 +16,15 @@ services:
   celery_worker:
     image: pickup
     restart: on-failure:3
-    env_file: .env.test
-    command: celery -A make_celery.celery_app worker -c 1 -l INFO -f /data/logs/worker.pickup.log
+    env_file: .env.prod
+    command: celery -A make_celery.celery_app worker -c 2 -l INFO -f /data/logs/worker.pickup.log
     depends_on:
       - api
 
   celery_beat:
     image: pickup
     restart: on-failure:3
-    env_file: .env.test
+    env_file: .env.prod
     command: celery -A make_celery.celery_app beat -l INFO -f /data/logs/beat.pickup.log
     volumes:
       - /data/resource/pickup:/data/resource/pickup

@@ -131,15 +131,14 @@ class SysNtfyService(BaseNtfyService):
             items.append(ntfy)
 
         paged.items = items
-        paged.max_id_map = {TActionEnum.SYS: max_id}
+        paged.max_id_map = {SysActionEnum.SYS: max_id}
 
         return paged
 
 
 class AnnounceNtfyService(BaseNtfyService):
     async def list(self, session, user: TokenUserInfo, params: QueryRemindNotifySchema):
-        cur_uid = user.id
-        paged = await announce_ntfy_repo.list(session, cur_uid, params)
+        paged = await announce_ntfy_repo.list(session, params)
         rows = paged.items
 
         max_id = 0
@@ -150,5 +149,5 @@ class AnnounceNtfyService(BaseNtfyService):
             items.append(ntfy)
 
         paged.items = items
-        paged.max_id_map = {TActionEnum.ANNOUNCE: max_id}
+        paged.max_id_map = {SysAnnounceActionEnum.ANNOUNCE: max_id}
         return paged
