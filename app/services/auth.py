@@ -10,7 +10,7 @@ import itsdangerous
 from sqlalchemy.exc import IntegrityError
 
 from app.config import settings
-from app.constant import AuthType, SMSSendBiz, UserRole
+from app.constant import AuthType, EmailBizEnum, SMSSendBiz, UserRole
 from app.core.app_code import AppCode
 from app.ext.auth import UrlSafeTimedSerializer
 from app.core.exception import AuthException
@@ -121,7 +121,7 @@ class AuthService:
                 raise AuthException(code=AppCode.ACCOUNT_EXIST, errmsg="邮箱已被使用")
 
             # 验证邮箱验证码
-            await email_service.verify_code(email, code, SMSSendBiz.SIGN)
+            await email_service.verify_code(email, code, EmailBizEnum.VERIFY_CODE_SIGN)
 
             # 创建用户
             user = await UserService.create_user(
