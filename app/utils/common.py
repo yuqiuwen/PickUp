@@ -1,5 +1,6 @@
 from collections import OrderedDict
 import hashlib
+import itertools
 import re
 import secrets
 from typing import Sequence
@@ -113,3 +114,66 @@ def gen_urlsafe_token(length=32) -> str:
 
 def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def list2tree(data, parent_id=0, ukey_name="id", pkey_name="parent_id"):
+    """
+    扁平数据树形化
+    :param data: 数据列表
+    :param parent_id: 父级id
+    :param ukey_name: 唯一键名
+    :param pkey_name: 父级键名
+    :return:
+    """
+    output = []
+    for node in data:
+        if node[pkey_name] != parent_id:
+            continue
+        # new_node = copy.deepcopy(node)
+        children = list2tree(data, node[ukey_name])
+        node.update(children=children)
+        output.append(node)
+    return output
+
+
+def flat_tree(data, ckey_name="children"):
+    ret = []
+    for item in data:
+        children = item.pop(ckey_name, None)
+        ret.append(item)
+        if children:
+            ret.extend(flat_tree(children))
+    return ret
+
+
+def list2tree_by_map(data, ukey_name="id", pkey_name="parent_id"):
+    nodes = {}
+    tree = []
+    for item in data:
+        item["children"] = []
+        nodes[item[ukey_name]] = item
+
+    for item in data:
+        parent_id = item[pkey_name]
+        if not parent_id:
+            tree.append(item)
+        else:
+            parent = nodes.get(parent_id)
+            if parent:
+                parent["children"].append(item)
+
+    return tree
+
+
+def chunker(iterable, chunk_size: int):
+    """
+    可迭代对象分片处理
+    :param iterable: 可迭代对象
+    :param chunk_size: 每片大小
+    :return:
+    """
+    while True:
+        chunk = list(itertools.islice(iterable, chunk_size))
+        if not chunk:
+            break
+        yield chunk

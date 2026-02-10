@@ -123,12 +123,15 @@ class SysNtfyService(BaseNtfyService):
 
         target_map = await self.get_targets(session, [(row.ttype, row.tid) for row in rows])
         items = []
+        max_id = 0
         for item in rows:
+            max_id = max(max_id, item.id)
             ntfy = SysNotifyItem.model_validate(item, strict=False)
             ntfy.target = target_map[item.ttype].get(item.tid)
             items.append(ntfy)
 
         paged.items = items
+        paged.max_id_map = {TActionEnum.SYS: max_id}
 
         return paged
 
@@ -137,4 +140,15 @@ class AnnounceNtfyService(BaseNtfyService):
     async def list(self, session, user: TokenUserInfo, params: QueryRemindNotifySchema):
         cur_uid = user.id
         paged = await announce_ntfy_repo.list(session, cur_uid, params)
+        rows = paged.items
+
+        max_id = 0
+        items = []
+        for item in rows:
+            max_id = max(max_id, item.id)
+            ntfy = AnnounceNotifyItem.model_validate(item, strict=False)
+            items.append(ntfy)
+
+        paged.items = items
+        paged.max_id_map = {TActionEnum.ANNOUNCE: max_id}
         return paged

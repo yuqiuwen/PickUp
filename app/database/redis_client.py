@@ -148,11 +148,16 @@ class RedisX:
 
     async def scan_uk(self, pattern, count=None):
         """使用scan command匹配keys并去重"""
-        uq_keys = set()
-        async for key in self.client.scan_iter(match=pattern, count=count):
-            if key not in uq_keys:
-                uq_keys.add(key)
-                yield key
+        seen = set()
+
+        kwargs = {"match": pattern}
+        if count is not None:
+            kwargs["count"] = count
+        async for key in self.client.scan_iter(**kwargs):
+            if key in seen:
+                continue
+            seen.add(key)
+            yield key
 
     async def delete_prefix(self, prefix: str) -> int:
         """
@@ -169,7 +174,7 @@ class RedisX:
 
 redcache = RedisX(prefix="REDIS_CACHE")  # 业务缓存
 pms_cache = RedisX(prefix="REDIS_PMS")  # 权限缓存
-redis_socket = RedisX(prefix="REDIS_SOCKET")   # socket专用
+redis_socket = RedisX(prefix="REDIS_SOCKET")  # socket专用
 
 
 async def init(enable_cache=True, enable_pms_cache=True, enable_redis_socket=True):

@@ -202,6 +202,7 @@ class AnnivStats(BaseModel):
     like_cnt: int = 0
     collect_cnt: int = 0
     comment_cnt: int = 0
+    share_cnt: int = 0
 
 
 class Interaction(BaseModel):

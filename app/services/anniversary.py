@@ -1,17 +1,27 @@
 import asyncio
 from typing import Any, List, Literal
-from app.constant import AnniversaryType, GroupRole, InviteTargetType
+from app.constant import (
+    AnniversaryType,
+    GroupRole,
+    InviteTargetType,
+    ResourceType,
+    UserInterActionEnum,
+)
 from app.core.http_handler import CursorPageRespModel
 from app.ext.jwt import TokenUserInfo
+from app.repo.interaction import interaction_repo
 from app.repo.anniversary import anniv_repo, anniv_member_repo, remind_repo, tag_repo
 from app.schemas.anniversary import (
     AnnivFeedItem,
     AnnivStat,
+    AnnivStats,
     CreateAnnivSchema,
+    Interaction,
     QueryAnnivSchema,
     RemindRuleSchema,
 )
 from app.schemas.common import MediaSchema, TagsSchema
+from app.services.cache.counter import AnnivCounter
 from app.services.invite import InviteService
 from app.utils.dater import DT
 
@@ -117,20 +127,39 @@ class AnnivService:
         cur_user: TokenUserInfo,
         params: QueryAnnivSchema,
     ) -> CursorPageRespModel[List[AnnivFeedItem]]:
-        paged = await anniv_repo.list_feed(session, cur_user.id, params)
+        uid = cur_user.id
+        paged = await anniv_repo.list_feed(session, uid, params)
 
         anniv_ids = [i.id for i in paged.items]
         tags_mapping = await anniv_repo.list_tag(session, anniv_ids)
         medias_mapping = await anniv_repo.list_media(session, anniv_ids)
+        interaction_mapping = await interaction_repo.retrieve_state(
+            session, uid, ResourceType.ANNIV, anniv_ids
+        )
+        counter_mapping = await AnnivCounter.get_many(anniv_ids)
 
         items: list[AnnivFeedItem] = []
         for anniv in paged.items:
-            anniv = AnnivFeedItem.model_validate(anniv)
-            tags = tags_mapping[anniv.id]
-            medias = medias_mapping[anniv.id]
-            anniv.tags = TagsSchema.to_dantic_model_list(tags, strict=False)
-            anniv.medias = MediaSchema.to_dantic_model_list(medias, strict=False)
-            items.append(anniv)
+            anniv_id = anniv.id
+            item = AnnivFeedItem.model_validate(anniv)
+            stats = counter_mapping.get(anniv_id)
+            if not stats:
+                stats = {
+                    "like_cnt": anniv.like_cnt,
+                    "collect_cnt": anniv.collect_cnt,
+                    "comment_cnt": anniv.comment_cnt,
+                    "share_cnt": anniv.share_cnt,
+                }
+            item.stats = AnnivStats(**stats)
+            item.interaction = Interaction(
+                is_like=interaction_mapping[anniv_id].get(UserInterActionEnum.LIKE, 0),
+                is_collect=interaction_mapping[anniv_id].get(UserInterActionEnum.COLLECT, 0),
+            )
+            tags = tags_mapping[anniv_id]
+            medias = medias_mapping[anniv_id]
+            item.tags = TagsSchema.to_dantic_model_list(tags, strict=False)
+            item.medias = MediaSchema.to_dantic_model_list(medias, strict=False)
+            items.append(item)
 
         paged.items = items
 

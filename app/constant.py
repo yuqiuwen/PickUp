@@ -195,6 +195,7 @@ class SysAnnounceActionEnum(IntEnumPro):
 class ResourceType(IntEnumPro):
     ANNIV = 1, "纪念日"
     NOTES = 2, "笔记"
+    COMMENT = 3, "评论"
 
 
 class EmailBizEnum(EnumPro):
@@ -232,8 +233,8 @@ class CommentState(IntEnumPro):
 class UserInterActionEnum(IntEnumPro):
     LIKE = 1, "点赞"
     COLLECT = 2, "收藏"
-    COMMENT = 3, "评论"
-    FOLLOW = 4, "关注"
+    SHARE = 3, "分享"
+    COMMENT = 4, "评论"
 
 
 class FollowState(IntEnumPro):

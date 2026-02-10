@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import List
+from typing import List, Literal
 from redis import retry
 from sqlalchemy import BigInteger, and_, cast, delete, exists, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -104,12 +104,27 @@ class AnnivRepo(BaseMixin[AnniversaryModel]):
         item = await self.first_or_404(session, *cond)
         return item
 
+    async def get_counter(
+        self,
+        session,
+        anniv_id: str,
+    ):
+        stmt = select(
+            self.model.collect_cnt,
+            self.model.like_cnt,
+            self.model.comment_cnt,
+            self.model.share_cnt,
+        ).where(self.model.state == 1, self.model.id == anniv_id)
+
+        row = (await session.execute(stmt)).mappings().first()
+        return dict(row) if row else {}
+
     async def retrieve(self, session, anniv_id: str, user_id: int = None):
         cond = [self.model.state == 1, self.model.id == anniv_id]
         if user_id:
             cond.append(self.model.owner_id == user_id)
 
-        item = await self.first_or_404(session, *cond)
+        item = await self.filter_one(session, *cond)
         return item
 
     async def retrieve_my_anniv(self, session, user_id: int, anniv_id: str, include_share=True):
@@ -364,6 +379,9 @@ class AnnivRepo(BaseMixin[AnniversaryModel]):
         for item in data:
             grouped_dict[item.anniv_id].append(item._asdict())
         return grouped_dict
+
+    async def batch_edit(self, session, data: list):
+        return await self.batch_update(session, data, handle_unmatch="ignore")
 
 
 class RemindRepo(BaseMixin[ReminderRule]):

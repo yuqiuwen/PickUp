@@ -43,6 +43,11 @@ class AnniversaryModel(ULIDModel, TSModel, BigOperatorModel, StateModel):
         DateTime(timezone=True), nullable=False, index=True, comment="下一次触发时间"
     )
 
+    collect_cnt = Column(Integer, nullable=False, server_default="0")
+    like_cnt = Column(Integer, nullable=False, server_default="0")
+    comment_cnt = Column(Integer, nullable=False, server_default="0")
+    share_cnt = Column(Integer, nullable=False, server_default="0")
+
     user = relationship(
         "User",
         lazy="joined",
