@@ -164,18 +164,18 @@ class UserService:
     async def get_stats(session, uid: int):
         cache = UserStatCache(uid)
         data = await cache.get(session)
-        if not data:
-            follow_cnt = await follow_repo.get_follow_cnt(session, uid)
-            fan_cnt = await fan_repo.get_fan_cnt(session, uid)
-            like_collect_cnt_mapping = await interaction_repo.get_like_collect_cnt(session, uid)
+        if data:
+            return data
 
-            # TODO comment
+        follow_cnt = await follow_repo.get_follow_cnt(session, uid)
+        fan_cnt = await fan_repo.get_fan_cnt(session, uid)
+        like_collect_cnt_mapping = await interaction_repo.get_like_collect_cnt(session, uid)
 
-            data = {"follow_cnt": follow_cnt, "fan_cnt": fan_cnt, **like_collect_cnt_mapping}
-            await cache.add(data)
-            ret = UserStats(**data)
+        # TODO comment
 
-        return ret
+        data = {"follow_cnt": follow_cnt, "fan_cnt": fan_cnt, **like_collect_cnt_mapping}
+        await cache.add(data)
+        return UserStats(**data)
 
 
 class SettingsService:
