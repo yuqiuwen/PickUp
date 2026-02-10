@@ -9,7 +9,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     uv sync --locked --no-install-project
 
-    
+
 COPY pyproject.toml uv.lock .
 
 RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen --no-dev
@@ -20,6 +20,8 @@ RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen --no-dev
 ENV PATH="/app/.venv/bin:$PATH"
 
 COPY . .
+
+RUN mkdir -p /data/logs && chmod -R 777 /data/logs
 
 RUN chmod +x /app/docker-entrypoint.sh
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
