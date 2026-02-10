@@ -63,9 +63,10 @@ class EmailService:
             await self._send_email(
                 to_email=email,
                 subject=self._get_email_subject(biz),
-                body=self._get_verify_code_email_body(code, biz),
+                body=self._get_verify_code_email_body(code),
             )
-        except Exception:
+        except Exception as e:
+            app_logger.error(str(e))
             raise AuthException(code=AppCode.EMAIL_SEND_FAILED, errmsg="邮件发送失败")
 
         return code

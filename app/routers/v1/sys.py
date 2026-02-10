@@ -21,7 +21,7 @@ def get_send_email_code_limit_key(request: Request):
 
 
 @router.post("/email/send_code", summary="发送邮箱验证码")
-@limiter.limit("2/minute", key_func=get_send_email_code_limit_key)
+# @limiter.limit("2/minute", key_func=get_send_email_code_limit_key)
 async def send_email_code(request: Request, data: EmailSchema):
     await email_service.send_verify_code(data.email, data.biz)
     return make_response()
