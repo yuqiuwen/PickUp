@@ -3,7 +3,7 @@ from typing import Annotated, Any
 from pydantic import BaseModel, Field, ConfigDict, TypeAdapter, BeforeValidator, field_validator
 from pydantic import EmailStr
 
-from app.constant import MediaType, SMSSendBiz
+from app.constant import EmailBizEnum, MediaType, SMSSendBiz
 from app.core.exception import ValidateError
 from app.utils.common import check_phone, parse_sort_str
 
@@ -117,7 +117,7 @@ class SmsSchema(BaseModel):
 
 
 class EmailSchema(BaseModel):
-    biz: SMSSendBiz
+    biz: EmailBizEnum
     email: EmailStr
 
 
