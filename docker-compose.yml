@@ -6,6 +6,7 @@ services:
     env_file: .env.prod
     environment:
       APP_ENV: production
+      RUN_MIGRATIONS: "1"
     volumes:
       - /data/logs/pickup:/data/logs/pickup
       - /data/resource/pickup:/data/resource/pickup

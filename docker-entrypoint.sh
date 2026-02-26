@@ -4,19 +4,14 @@
 set -e
 
 # (仅可在开发环境下执行) alembic revision --autogenerate
-echo "Running migrations..."
-echo "当前数据库版本:"
-alembic current || echo "无版本信息"
 
-echo ""
-echo "执行数据库迁移..."
-alembic upgrade head
-
-echo ""
-echo "迁移后数据库版本:"
-alembic current
-
-echo ""
-echo "✅ 初始化完成，启动应用..."
+if [ "$RUN_MIGRATIONS" = "1" ]; then
+    echo "Running migrations..."
+    alembic upgrade head
+    echo ""
+    echo "迁移后数据库版本:"
+    alembic current
+    echo "✅ 初始化完成，启动应用..."
+fi
 
 exec "$@"
